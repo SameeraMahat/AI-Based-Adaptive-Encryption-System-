@@ -1,0 +1,114 @@
+## 1. Check Python Version
+
+```bash
+python --version
+```
+
+---
+
+## 2. Create Virtual Environment
+
+```bash
+py -3.12 -m venv venv
+```
+
+---
+
+## 3. Activate Virtual Environment
+
+```bash
+.\venv\Scripts\Activate
+```
+
+---
+
+## 4. Create React Project (Vite)
+
+```bash
+npm create vite@latest frontend
+```
+
+---
+
+## 5. Install React Dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+---
+
+## 6. Install Additional React Packages
+
+```bash
+npm install axios react-router-dom recharts
+```
+
+---
+
+## 7. Install Tailwind CSS
+
+```bash
+npm install tailwindcss @tailwindcss/vite
+```
+
+---
+
+## 8. Move to Backend
+
+```bash
+cd ../backend
+```
+
+---
+
+## 9. Install Backend Requirements
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 10. Install Flask-CORS
+
+```bash
+pip install Flask-Cors
+```
+
+---
+
+## 11. Update Requirements File
+
+```bash
+pip freeze > requirements.txt
+```
+
+---
+
+## 12. Run Flask Backend
+
+```bash
+python app.py
+```
+
+---
+
+## 13. Run React Frontend
+
+```bash
+cd ../frontend
+npm run dev
+```
+
+---
+
+## 14. Git Commands
+
+```bash
+git status
+git add .
+git commit -m "Set up Flask backend foundation and React frontend"
+git push origin main
+```
