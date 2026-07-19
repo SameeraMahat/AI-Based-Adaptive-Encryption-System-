@@ -5,6 +5,9 @@ from feature_extraction.text_extractor import extract_text
 from feature_extraction.pii_detector import detect_pii
 from feature_extraction.file_features import extract_file_features
 from feature_extraction.system_features import extract_system_features
+from feature_extraction.classifier import classify_document
+from feature_extraction.sensitivity import calculate_sensitivity
+
 
 upload_bp = Blueprint("upload", __name__)
 
@@ -59,6 +62,12 @@ def upload_file():
     pii = detect_pii(text)
     features = extract_file_features(text, pii)
     system_features = extract_system_features(filepath)
+    classification = classify_document(text)
+    sensitivity = calculate_sensitivity(
+    features,
+    classification,
+    system_features
+)
 
     return jsonify({
         "message": "File uploaded successfully.",
@@ -66,5 +75,7 @@ def upload_file():
         "extracted_text": text,
         "pii": pii,
         "features": features,
-        "system_features": system_features
+        "system_features": system_features,
+        "classification": classification,
+        "sensitivity": sensitivity,
     }), 200
