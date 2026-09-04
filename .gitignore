@@ -1,0 +1,26 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Environment
+.env
+backend/.env
+
+# Database
+*.sqlite3
+
+# Uploads
+backend/dataset/uploads/
+backend/uploads/
+
+# Encryption keys
+backend/keys/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
