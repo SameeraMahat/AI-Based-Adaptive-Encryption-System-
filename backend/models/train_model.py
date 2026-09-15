@@ -2,21 +2,23 @@ import os
 import joblib
 import pandas as pd
 
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     classification_report,
     confusion_matrix
 )
+from sklearn.model_selection import (
+    train_test_split,
+    RandomizedSearchCV
+)
 
 
-# --------------------------------------------------
+# ============================================================
 # PATHS
-# --------------------------------------------------
+# ============================================================
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -26,22 +28,53 @@ DATASET_PATH = os.path.join(
     "encryption_dataset_v2.csv"
 )
 
-MODEL_DIR = os.path.join(
-    BASE_DIR,
-    "models"
-)
+MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MODEL_PATH = os.path.join(
     MODEL_DIR,
-    "encryption_model.pkl"
+    "rf_model.pkl"
+)
+
+ENCODER_PATH = os.path.join(
+    MODEL_DIR,
+    "label_encoders.pkl"
 )
 
 
-# --------------------------------------------------
-# LOAD DATASET
-# --------------------------------------------------
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
-print("\nLoading encryption dataset...")
+# IMPORTANT:
+# CPU and RAM are NOT used because they describe machine state,
+# not document characteristics.
+
+FEATURE_COLUMNS = [
+    "file_type",
+    "file_size_mb",
+    "document_category",
+    "pii_count",
+    "category_confidence",
+    "confidential_marker",
+    "sensitivity_score"
+]
+
+TARGET_COLUMN = "algorithm"
+
+CATEGORICAL_COLUMNS = [
+    "file_type",
+    "document_category",
+    "confidential_marker"
+]
+
+
+# ============================================================
+# LOAD DATASET
+# ============================================================
+
+print("\n================================")
+print("LOADING DATASET")
+print("================================")
 
 if not os.path.exists(DATASET_PATH):
     raise FileNotFoundError(
@@ -50,25 +83,32 @@ if not os.path.exists(DATASET_PATH):
 
 df = pd.read_csv(DATASET_PATH)
 
-print(f"Dataset shape: {df.shape}")
+print("Dataset loaded successfully.")
+print("Dataset shape:", df.shape)
+
+print("\nFirst 5 rows:")
+print(df.head())
 
 
-# --------------------------------------------------
-# VALIDATE DATASET
-# --------------------------------------------------
+# ============================================================
+# DATASET INFORMATION
+# ============================================================
 
-required_columns = [
-    "file_type",
-    "file_size_mb",
-    "cpu_usage",
-    "ram_usage",
-    "pii_count",
-    "document_category",
-    "category_confidence",
-    "confidential_marker",
-    "sensitivity_score",
-    "algorithm"
-]
+print("\n================================")
+print("DATASET COLUMNS")
+print("================================")
+
+print(df.columns.tolist())
+
+print("\nAlgorithm distribution:")
+print(df[TARGET_COLUMN].value_counts())
+
+
+# ============================================================
+# CHECK REQUIRED COLUMNS
+# ============================================================
+
+required_columns = FEATURE_COLUMNS + [TARGET_COLUMN]
 
 missing_columns = [
     column
@@ -82,143 +122,183 @@ if missing_columns:
     )
 
 
-# --------------------------------------------------
-# FEATURES AND TARGET
-# --------------------------------------------------
+# ============================================================
+# SELECT FEATURES AND TARGET
+# ============================================================
 
-FEATURE_COLUMNS = [
-    "file_type",
+X = df[FEATURE_COLUMNS].copy()
+y = df[TARGET_COLUMN].copy()
+
+
+# ============================================================
+# DATA CLEANING
+# ============================================================
+
+print("\n================================")
+print("DATA CLEANING")
+print("================================")
+
+rows_before = len(X)
+
+# Remove rows where target is missing
+valid_rows = y.notna()
+
+X = X.loc[valid_rows].copy()
+y = y.loc[valid_rows].copy()
+
+# Remove rows where required features are missing
+valid_rows = X.notna().all(axis=1)
+
+X = X.loc[valid_rows].copy()
+y = y.loc[valid_rows].copy()
+
+print("Rows before cleaning:", rows_before)
+print("Rows after cleaning :", len(X))
+
+
+# ============================================================
+# FIX DATA TYPES
+# ============================================================
+
+# Convert numeric columns explicitly.
+
+NUMERIC_COLUMNS = [
     "file_size_mb",
-    "cpu_usage",
-    "ram_usage",
-    "pii_count",
-    "document_category",
-    "category_confidence",
-    "confidential_marker",
-    "sensitivity_score"
-]
-
-TARGET_COLUMN = "algorithm"
-
-
-X = df[FEATURE_COLUMNS]
-y = df[TARGET_COLUMN]
-
-
-# --------------------------------------------------
-# DISPLAY DATASET INFORMATION
-# --------------------------------------------------
-
-print("\nFeatures used by the model:")
-
-for feature in FEATURE_COLUMNS:
-    print(f"  - {feature}")
-
-print("\nTarget classes:")
-
-for target, count in y.value_counts().items():
-    print(f"  - {target}: {count}")
-
-
-# --------------------------------------------------
-# CATEGORICAL AND NUMERICAL FEATURES
-# --------------------------------------------------
-
-CATEGORICAL_FEATURES = [
-    "file_type",
-    "document_category",
-    "confidential_marker"
-]
-
-NUMERICAL_FEATURES = [
-    "file_size_mb",
-    "cpu_usage",
-    "ram_usage",
     "pii_count",
     "category_confidence",
     "sensitivity_score"
 ]
 
+for column in NUMERIC_COLUMNS:
+    X[column] = pd.to_numeric(
+        X[column],
+        errors="coerce"
+    )
 
-# --------------------------------------------------
-# PREPROCESSING
-# --------------------------------------------------
+# Remove rows that became invalid after numeric conversion.
+valid_rows = X[NUMERIC_COLUMNS].notna().all(axis=1)
 
-preprocessor = ColumnTransformer(
-    transformers=[
-        (
-            "categorical",
-            OneHotEncoder(
-                handle_unknown="ignore"
-            ),
-            CATEGORICAL_FEATURES
-        ),
-        (
-            "numerical",
-            "passthrough",
-            NUMERICAL_FEATURES
-        )
-    ]
+X = X.loc[valid_rows].copy()
+y = y.loc[valid_rows].copy()
+
+
+# ============================================================
+# ENCODE CATEGORICAL FEATURES
+# ============================================================
+
+print("\n================================")
+print("ENCODING CATEGORICAL FEATURES")
+print("================================")
+
+encoders = {}
+
+for column in CATEGORICAL_COLUMNS:
+
+    encoder = LabelEncoder()
+
+    # Convert source column to string first.
+    values = X[column].astype(str)
+
+    # Encode to integers.
+    encoded_values = encoder.fit_transform(values)
+
+    # IMPORTANT:
+    # Assign a numeric Series instead of assigning integers
+    # directly into pandas StringDtype column.
+    X[column] = pd.Series(
+        encoded_values,
+        index=X.index,
+        dtype="int64"
+    )
+
+    encoders[column] = encoder
+
+    print(f"\n{column}:")
+    for index, value in enumerate(encoder.classes_):
+        print(f"  {index} = {value}")
+
+
+# ============================================================
+# ENCODE TARGET
+# ============================================================
+
+print("\n================================")
+print("ENCODING TARGET")
+print("================================")
+
+target_encoder = LabelEncoder()
+
+y_encoded = target_encoder.fit_transform(
+    y.astype(str)
 )
 
+encoders["algorithm"] = target_encoder
 
-# --------------------------------------------------
-# RANDOM FOREST MODEL
-# --------------------------------------------------
+print("\nAlgorithm classes:")
 
-random_forest = RandomForestClassifier(
-    n_estimators=300,
-    max_depth=15,
-    random_state=42,
-    class_weight="balanced",
-    n_jobs=-1
-)
+for index, algorithm in enumerate(
+    target_encoder.classes_
+):
+    print(f"  {index} = {algorithm}")
 
 
-# --------------------------------------------------
-# COMPLETE ML PIPELINE
-# --------------------------------------------------
+# ============================================================
+# FINAL FEATURE CHECK
+# ============================================================
 
-model = Pipeline(
-    steps=[
-        (
-            "preprocessor",
-            preprocessor
-        ),
-        (
-            "classifier",
-            random_forest
-        )
-    ]
-)
+print("\n================================")
+print("FINAL FEATURES")
+print("================================")
+
+print(X.dtypes)
+
+print("\nFeature columns:")
+for column in FEATURE_COLUMNS:
+    print("-", column)
+
+print("\nTarget:")
+print("-", TARGET_COLUMN)
 
 
-# --------------------------------------------------
+# ============================================================
 # TRAIN / TEST SPLIT
-# --------------------------------------------------
+# ============================================================
+
+print("\n================================")
+print("TRAIN / TEST SPLIT")
+print("================================")
 
 X_train, X_test, y_train, y_test = train_test_split(
     X,
-    y,
+    y_encoded,
     test_size=0.20,
     random_state=42,
-    stratify=y
+    stratify=y_encoded
 )
 
-print(
-    f"\nTraining samples: {len(X_train)}"
+print("Training samples:", len(X_train))
+print("Testing samples :", len(X_test))
+
+
+# ============================================================
+# RANDOM FOREST
+# ============================================================
+
+print("\n================================")
+print("RANDOM FOREST TRAINING")
+print("================================")
+
+model = RandomForestClassifier(
+    n_estimators=500,
+    max_depth=None,
+    min_samples_split=2,
+    min_samples_leaf=1,
+    max_features="sqrt",
+    class_weight="balanced_subsample",
+    random_state=42,
+    n_jobs=-1
 )
-
-print(
-    f"Testing samples: {len(X_test)}"
-)
-
-
-# --------------------------------------------------
-# TRAIN MODEL
-# --------------------------------------------------
-
-print("\nTraining Random Forest model...")
+print("Training Random Forest...")
 
 model.fit(
     X_train,
@@ -228,9 +308,13 @@ model.fit(
 print("Training completed.")
 
 
-# --------------------------------------------------
-# EVALUATION
-# --------------------------------------------------
+# ============================================================
+# MODEL EVALUATION
+# ============================================================
+
+print("\n================================")
+print("MODEL EVALUATION")
+print("================================")
 
 y_pred = model.predict(X_test)
 
@@ -239,16 +323,16 @@ accuracy = accuracy_score(
     y_pred
 )
 
-print(
-    f"\nModel Accuracy: {accuracy * 100:.2f}%"
-)
+print(f"Accuracy: {accuracy:.4f}")
 
 print("\nClassification Report:")
 
 print(
     classification_report(
         y_test,
-        y_pred
+        y_pred,
+        target_names=target_encoder.classes_,
+        zero_division=0
     )
 )
 
@@ -262,26 +346,71 @@ print(
 )
 
 
-# --------------------------------------------------
-# SAVE MODEL
-# --------------------------------------------------
+# ============================================================
+# FEATURE IMPORTANCE
+# ============================================================
 
-os.makedirs(
-    MODEL_DIR,
-    exist_ok=True
+print("\n================================")
+print("FEATURE IMPORTANCE")
+print("================================")
+
+feature_importance = pd.DataFrame({
+    "feature": FEATURE_COLUMNS,
+    "importance": model.feature_importances_
+})
+
+feature_importance = feature_importance.sort_values(
+    by="importance",
+    ascending=False
 )
+
+print(feature_importance.to_string(index=False))
+
+
+# ============================================================
+# SAVE MODEL
+# ============================================================
+
+print("\n================================")
+print("SAVING MODEL")
+print("================================")
 
 joblib.dump(
     model,
     MODEL_PATH
 )
 
-print(
-    f"\nModel saved successfully:"
+joblib.dump(
+    encoders,
+    ENCODER_PATH
 )
 
-print(
-    MODEL_PATH
-)
+print("Model saved to:")
+print(MODEL_PATH)
 
-print("\nTraining pipeline completed successfully.")
+print("\nEncoders saved to:")
+print(ENCODER_PATH)
+
+
+# ============================================================
+# FINAL SUMMARY
+# ============================================================
+
+print("\n================================")
+print("TRAINING COMPLETE")
+print("================================")
+
+print(f"Dataset rows      : {len(X)}")
+print(f"Training samples  : {len(X_train)}")
+print(f"Testing samples   : {len(X_test)}")
+print(f"Accuracy          : {accuracy:.4f}")
+
+print("\nPredicted algorithms:")
+
+for algorithm in target_encoder.classes_:
+    print("-", algorithm)
+
+print("\nGenerated files:")
+
+print("-", MODEL_PATH)
+print("-", ENCODER_PATH)

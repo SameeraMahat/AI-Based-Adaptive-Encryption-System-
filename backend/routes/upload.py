@@ -1,6 +1,5 @@
-from flask import Blueprint, request, jsonify, send_from_directory
+from flask import Blueprint, request, jsonify
 import os
-import time
 from werkzeug.utils import secure_filename
 
 from feature_extraction.text_extractor import extract_text
@@ -10,24 +9,7 @@ from feature_extraction.system_features import extract_system_features
 from feature_extraction.classifier import classify_document
 from feature_extraction.sensitivity import calculate_sensitivity
 
-# ML prediction
-from models.predict import predict_encryption
-
-# Key manager
-from encryption.key_manager import generate_and_save_key
-
-# AES
-from encryption.aes import encrypt_file as aes_encrypt_file
-
-# ChaCha20
-from encryption.chacha20 import encrypt_file as chacha_encrypt_file
-
-# Hybrid
-from encryption.hybrid import (
-    generate_rsa_key_pair,
-    save_rsa_keys,
-    encrypt_file as hybrid_encrypt_file
-)
+from models.predict_model import predict_encryption_algorithm
 
 
 upload_bp = Blueprint("upload", __name__)
@@ -54,9 +36,9 @@ def allowed_file(filename):
 @upload_bp.route("/upload", methods=["POST"])
 def upload_file():
 
-    # --------------------------------
+    # ========================================================
     # FILE VALIDATION
-    # --------------------------------
+    # ========================================================
 
     if "file" not in request.files:
         return jsonify({
@@ -75,9 +57,10 @@ def upload_file():
             "error": "Unsupported file type."
         }), 400
 
-    # --------------------------------
-    # SAVE UPLOADED FILE
-    # --------------------------------
+
+    # ========================================================
+    # SAVE FILE
+    # ========================================================
 
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -90,339 +73,150 @@ def upload_file():
 
     file.save(filepath)
 
-    # Original file size
-    original_size = os.path.getsize(filepath)
 
-    # --------------------------------
-    # FEATURE EXTRACTION PIPELINE
-    # --------------------------------
+    # ========================================================
+    # TEXT / OCR EXTRACTION
+    # ========================================================
 
-    # 1. Extract text / OCR
     text = extract_text(filepath)
 
-    # 2. Detect PII
+
+    # ========================================================
+    # PII DETECTION
+    # ========================================================
+
     pii = detect_pii(text)
 
-    # 3. Extract file/text features
+
+    # ========================================================
+    # FILE FEATURE EXTRACTION
+    # ========================================================
+
     features = extract_file_features(
         text,
         pii
     )
 
-    # 4. Extract system/file features
+
+    # ========================================================
+    # SYSTEM FEATURES
+    # ========================================================
+
     system_features = extract_system_features(
         filepath
     )
 
-    # 5. Classify document
+
+    # ========================================================
+    # DOCUMENT CLASSIFICATION
+    # ========================================================
+
     classification = classify_document(
         text
     )
 
-    # 6. Calculate sensitivity features
+
+    # ========================================================
+    # SENSITIVITY CALCULATION
+    # ========================================================
+
     sensitivity = calculate_sensitivity(
         features,
         classification,
         system_features
     )
 
-    # --------------------------------
-    # AI / ML ENCRYPTION PREDICTION
-    # --------------------------------
 
-    ml_prediction = predict_encryption(
-        features,
-        classification,
-        sensitivity,
-        system_features
-    )
+    # ========================================================
+    # PREPARE FEATURES FOR RANDOM FOREST
+    # ========================================================
 
-    predicted_algorithm = ml_prediction["algorithm"]
+    # These MUST match the features used during training.
 
-    # --------------------------------
-    # ENCRYPTION SETUP
-    # --------------------------------
+    prediction_features = {
+        "file_type": os.path.splitext(filename)[1]
+        .replace(".", "")
+        .upper(),
 
-    encrypted_folder = os.path.join(
-        UPLOAD_FOLDER,
-        "encrypted"
-    )
+        "file_size_mb": os.path.getsize(filepath)
+        / (1024 * 1024),
 
-    os.makedirs(
-        encrypted_folder,
-        exist_ok=True
-    )
+        "document_category": classification.get(
+            "document_category",
+            "General"
+        ),
 
-    encrypted_filename = filename + ".enc"
+        "pii_count": features.get(
+            "pii_count",
+            0
+        ),
 
-    encrypted_path = os.path.join(
-        encrypted_folder,
-        encrypted_filename
-    )
+        "category_confidence": classification.get(
+            "category_confidence",
+            0.5
+        ),
 
-    key_path = None
-    public_key_path = None
+        "confidential_marker": (
+            "Yes"
+            if features.get(
+                "confidential_keyword_count",
+                0
+            ) > 0
+            else "No"
+        ),
 
-    # --------------------------------
-    # START ENCRYPTION TIMER
-    # --------------------------------
-
-    encryption_start = time.perf_counter()
-
-    # --------------------------------
-    # AES-256-GCM
-    # --------------------------------
-
-    if predicted_algorithm == "AES":
-
-        encryption_algorithm = "AES-256-GCM"
-        security_level = "High"
-
-        reason = (
-            "Random Forest selected AES based on the "
-            "extracted file, system, PII, classification, "
-            "and sensitivity features."
+        "sensitivity_score": sensitivity.get(
+            "sensitivity_score",
+            0
         )
-
-        # Generate 256-bit AES key
-        key, key_path = generate_and_save_key(
-            filename
-        )
-
-        # Encrypt file
-        aes_encrypt_file(
-            filepath,
-            encrypted_path,
-            key
-        )
-
-    # --------------------------------
-    # CHACHA20
-    # --------------------------------
-
-    elif predicted_algorithm == "ChaCha20":
-
-        encryption_algorithm = "ChaCha20"
-        security_level = "Medium"
-
-        reason = (
-            "Random Forest selected ChaCha20 based on the "
-            "extracted file, system, PII, classification, "
-            "and sensitivity features."
-        )
-
-        # Generate 256-bit ChaCha20 key
-        key, key_path = generate_and_save_key(
-            filename
-        )
-
-        # Encrypt file
-        chacha_encrypt_file(
-            filepath,
-            encrypted_path,
-            key
-        )
-
-    # --------------------------------
-    # HYBRID AES-256-GCM + RSA-OAEP
-    # --------------------------------
-
-    elif predicted_algorithm == "Hybrid":
-
-        encryption_algorithm = (
-            "Hybrid AES-256-GCM + RSA-OAEP"
-        )
-
-        security_level = "Very High"
-
-        reason = (
-            "Random Forest selected Hybrid encryption "
-            "based on the predicted security requirements "
-            "of the uploaded file."
-        )
-
-        # Generate RSA-2048 key pair
-        private_key, public_key = generate_rsa_key_pair()
-
-        # Save RSA keys
-        key_path, public_key_path = save_rsa_keys(
-            filename,
-            private_key,
-            public_key
-        )
-
-        # Encrypt file
-        hybrid_encrypt_file(
-            filepath,
-            encrypted_path,
-            public_key
-        )
-
-    # --------------------------------
-    # UNSUPPORTED ML PREDICTION
-    # --------------------------------
-
-    else:
-
-        return jsonify({
-            "error": (
-                f"Unsupported ML prediction: "
-                f"{predicted_algorithm}"
-            )
-        }), 400
-
-    # --------------------------------
-    # STOP ENCRYPTION TIMER
-    # --------------------------------
-
-    encryption_time_ms = (
-        time.perf_counter() - encryption_start
-    ) * 1000
-
-    # --------------------------------
-    # ENCRYPTED FILE SIZE
-    # --------------------------------
-
-    encrypted_size = os.path.getsize(
-        encrypted_path
-    )
-
-    # --------------------------------
-    # SIZE OVERHEAD
-    # --------------------------------
-
-    if original_size > 0:
-
-        size_overhead_percent = (
-            (encrypted_size - original_size)
-            / original_size
-        ) * 100
-
-    else:
-
-        size_overhead_percent = 0
-
-    # --------------------------------
-    # PERFORMANCE DATA
-    # --------------------------------
-
-    performance = {
-
-        "original_size_bytes":
-            original_size,
-
-        "encrypted_size_bytes":
-            encrypted_size,
-
-        "encryption_time_ms":
-            round(encryption_time_ms, 2),
-
-        "size_overhead_percent":
-            round(size_overhead_percent, 2),
-
-        "algorithm":
-            encryption_algorithm
     }
 
-    # --------------------------------
-    # RESPONSE
-    # --------------------------------
+
+    # ========================================================
+    # RANDOM FOREST PREDICTION
+    # ========================================================
+
+    try:
+
+        ml_prediction = predict_encryption_algorithm(
+            prediction_features
+        )
+
+    except Exception as e:
+
+        return jsonify({
+            "error": "ML prediction failed.",
+            "details": str(e)
+        }), 500
+
+
+    # ========================================================
+    # FINAL RESPONSE
+    # ========================================================
 
     return jsonify({
 
-        "message":
-            "File uploaded and encrypted successfully.",
+        "message": "File uploaded successfully.",
 
-        "filename":
-            filename,
+        "filename": filename,
 
-        # --------------------------------
-        # EXTRACTED INFORMATION
-        # --------------------------------
+        "extracted_text": text,
 
-        "extracted_text":
-            text,
+        "pii": pii,
 
-        "pii":
-            pii,
+        "features": features,
 
-        "features":
-            features,
+        "system_features": system_features,
 
-        "system_features":
-            system_features,
+        "classification": classification,
 
-        "classification":
-            classification,
+        "sensitivity": sensitivity,
 
-        "sensitivity":
-            sensitivity,
+        "prediction_features": prediction_features,
 
-        # --------------------------------
-        # ML DECISION
-        # --------------------------------
-
-        "ml_prediction": {
-
-            "algorithm":
-                ml_prediction["algorithm"],
-
-            "confidence":
-                ml_prediction["confidence"],
-
-            "probabilities":
-                ml_prediction["probabilities"]
-        },
-
-        # --------------------------------
-        # ACTUAL ENCRYPTION
-        # --------------------------------
-
-        "encryption": {
-
-            "algorithm":
-                encryption_algorithm,
-
-            "security_level":
-                security_level,
-
-            "reason":
-                reason,
-
-            "encrypted_file":
-                encrypted_filename,
-
-            "key_file":
-                key_path
-        },
-
-        # --------------------------------
-        # PERFORMANCE
-        # --------------------------------
-
-        "performance":
-            performance
+        "prediction": {
+            "algorithm": ml_prediction["algorithm"],
+            "confidence": ml_prediction["confidence"]
+        }
 
     }), 200
-
-
-# --------------------------------
-# DOWNLOAD ENCRYPTED FILE
-# --------------------------------
-
-@upload_bp.route(
-    "/download/<filename>",
-    methods=["GET"]
-)
-def download_file(filename):
-
-    encrypted_folder = os.path.join(
-        UPLOAD_FOLDER,
-        "encrypted"
-    )
-
-    return send_from_directory(
-        encrypted_folder,
-        filename,
-        as_attachment=True
-    )

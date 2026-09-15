@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import './App.css'
 
 const API_URL = 'http://127.0.0.1:5000/api'
@@ -58,17 +58,9 @@ function App() {
 
     const value = level.toLowerCase()
 
-    if (value.includes('very')) {
-      return 'very-high'
-    }
-
-    if (value.includes('high')) {
-      return 'high'
-    }
-
-    if (value.includes('medium')) {
-      return 'medium'
-    }
+    if (value.includes('very')) return 'very-high'
+    if (value.includes('high')) return 'high'
+    if (value.includes('medium')) return 'medium'
 
     return 'standard'
   }
@@ -76,20 +68,11 @@ function App() {
   const getPiiCount = () => {
     if (!result?.pii) return 0
 
-    return Object.values(result.pii).reduce(
-      (total, value) => {
-        if (Array.isArray(value)) {
-          return total + value.length
-        }
-
-        if (typeof value === 'number') {
-          return total + value
-        }
-
-        return total
-      },
-      0
-    )
+    return Object.values(result.pii).reduce((total, value) => {
+      if (Array.isArray(value)) return total + value.length
+      if (typeof value === 'number') return total + value
+      return total
+    }, 0)
   }
 
   const formatBytes = (bytes) => {
@@ -97,16 +80,8 @@ function App() {
       return '0 Bytes'
     }
 
-    const units = [
-      'Bytes',
-      'KB',
-      'MB',
-      'GB'
-    ]
-
-    const index = Math.floor(
-      Math.log(bytes) / Math.log(1024)
-    )
+    const units = ['Bytes', 'KB', 'MB', 'GB']
+    const index = Math.floor(Math.log(bytes) / Math.log(1024))
 
     return `${(
       bytes / Math.pow(1024, index)
@@ -126,879 +101,865 @@ function App() {
       return 'N/A'
     }
 
-    if (score >= 75) {
-      return 'Very High'
-    }
-
-    if (score >= 50) {
-      return 'High'
-    }
-
-    if (score >= 25) {
-      return 'Medium'
-    }
+    if (score >= 75) return 'Very High'
+    if (score >= 50) return 'High'
+    if (score >= 25) return 'Medium'
 
     return 'Low'
   }
 
+  const recentFiles = [
+    {
+      name: 'research_paper.pdf',
+      type: 'PDF',
+      time: '2 min ago',
+    },
+    {
+      name: 'data_analysis.xlsx',
+      type: 'XLSX',
+      time: '15 min ago',
+    },
+    {
+      name: 'project_docs.zip',
+      type: 'ZIP',
+      time: '1 hour ago',
+    },
+    {
+      name: 'image_sample.png',
+      type: 'IMG',
+      time: '2 hours ago',
+    },
+  ]
+
   return (
     <div className="app">
 
-      {/* HEADER */}
+      {/* =====================================================
+          SIDEBAR
+          ===================================================== */}
 
-      <header className="header">
+      <aside className="sidebar">
 
-        <div className="brand">
+        <div className="sidebar-brand">
 
-          <div className="brand-icon">
-            🔐
+          <div className="shield-logo">
+            <span>Γùå</span>
           </div>
 
-          <div>
-            <h1>
-              Adaptive Encryption
-            </h1>
-
-            <span>
-              AI-Powered Security System
-            </span>
+          <div className="brand-copy">
+            <h1>Adaptive Encryption</h1>
+            <p>AI-Powered Security System</p>
           </div>
 
         </div>
 
-        <div className="status">
+        <div className="sidebar-divider" />
 
-          <span className="status-dot"></span>
+        <nav className="navigation">
 
-          Backend Connected
+          <button className="nav-item active">
+            <span className="nav-icon">Γîé</span>
+            <span>Home</span>
+          </button>
 
-        </div>
+          <button className="nav-item">
+            <span className="nav-icon">Γûú</span>
+            <span>Encrypt</span>
+          </button>
 
-      </header>
+          <button className="nav-item">
+            <span className="nav-icon">Γù╖</span>
+            <span>History</span>
+          </button>
 
+          <button className="nav-item">
+            <span className="nav-icon">ΓûÑ</span>
+            <span>Analytics</span>
+          </button>
 
-      {/* MAIN */}
+          <button className="nav-item">
+            <span className="nav-icon">ΓÜÖ</span>
+            <span>Settings</span>
+          </button>
 
-      <main className="main">
+        </nav>
 
-        {/* HERO */}
+        <div className="sidebar-bottom">
 
-        <section className="hero-section">
+          <div className="sidebar-message">
+            <div className="message-line" />
 
-          <div>
-
-            <p className="eyebrow">
-              INTELLIGENT FILE PROTECTION
-            </p>
-
-            <h2>
-              Upload. Analyze.
+            <strong>
+              Security
               <br />
-              <span>Encrypt Adaptively.</span>
-            </h2>
+              Today.
+              <br />
+              Brighter
+              <br />
+              Tomorrows.
+            </strong>
+          </div>
 
-            <p className="hero-text">
-              Our AI-driven encryption engine analyzes
-              your file and automatically selects the
-              most suitable encryption strategy based
-              on sensitivity, file characteristics and
-              detected information.
-            </p>
+          <div className="version">
+            <span>v1.0.0</span>
+            <span>┬⌐ 2025 Adaptive Encryption</span>
+            <span>All rights reserved.</span>
+          </div>
+
+        </div>
+
+      </aside>
+
+
+      {/* =====================================================
+          MAIN AREA
+          ===================================================== */}
+
+      <div className="workspace">
+
+        {/* TOP BAR */}
+
+        <header className="topbar">
+
+          <div className="search-box">
+
+            <span className="search-icon">Γîò</span>
+
+            <input
+              type="text"
+              placeholder="Search files, history, or settings..."
+            />
+
+            <kbd>Ctrl K</kbd>
 
           </div>
 
-        </section>
+          <div className="topbar-actions">
 
+            <button className="notification">
+              ΓÖº
+            </button>
 
-        {/* UPLOAD CARD */}
-
-        <section className="upload-card">
-
-          <div className="section-title">
-
-            <div className="section-icon">
-              ↑
+            <div className="backend-status">
+              <span className="online-dot" />
+              Backend Connected
             </div>
 
-            <div>
+            <div className="profile">
+              U
+            </div>
 
-              <h3>
-                Upload & Analysis
-              </h3>
+          </div>
 
-              <p>
-                Select a file to begin adaptive security analysis.
+        </header>
+
+
+        {/* CONTENT */}
+
+        <main className="content">
+
+          {/* HERO */}
+
+          <section className="hero">
+
+            <div className="hero-copy">
+
+              <p className="hero-eyebrow">
+                INTELLIGENT FILE PROTECTION
+              </p>
+
+              <h2>
+                Upload. Analyze.
+                <br />
+                <span>Encrypt Adaptively.</span>
+              </h2>
+
+              <p className="hero-description">
+                Our AI-driven encryption engine analyzes your file
+                and automatically selects the most suitable
+                encryption strategy based on sensitivity,
+                file characteristics and detected information.
               </p>
 
             </div>
 
-          </div>
-
-
-          <label className="drop-zone">
-
-            <input
-              type="file"
-              onChange={handleFileChange}
-              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
-            />
-
-            <div className="upload-icon">
-              ↑
-            </div>
-
-            {file ? (
-              <>
-                <strong>
-                  {file.name}
-                </strong>
-
-                <span>
-                  {formatBytes(file.size)}
-                </span>
-              </>
-            ) : (
-              <>
-                <strong>
-                  Choose a file to encrypt
-                </strong>
-
-                <span>
-                  PDF, DOCX, TXT, PNG, JPG or JPEG
-                </span>
-              </>
-            )}
-
-          </label>
-
-
-          {file && (
-            <div className="selected-file">
-
-              <div>
-
-                <span className="file-label">
-                  Selected file
-                </span>
-
-                <strong>
-                  {file.name}
-                </strong>
-
-              </div>
-
-              <span>
-                {formatBytes(file.size)}
-              </span>
-
-            </div>
-          )}
-
-
-          <button
-            className="analyze-button"
-            onClick={handleUpload}
-            disabled={!file || loading}
-          >
-            {loading
-              ? 'Analyzing & Encrypting...'
-              : 'Analyze & Encrypt File'}
-          </button>
-
-
-          {error && (
-            <div className="error-message">
-
-              <strong>
-                Error:
-              </strong>{' '}
-
-              {error}
-
-            </div>
-          )}
-
-        </section>
-
-
-        {/* RESULTS */}
-
-        {result && (
-          <section className="results-section">
-
-            {/* RESULTS HEADER */}
-
-            <div className="results-header">
-
-              <div>
-
-                <p className="eyebrow">
-                  ANALYSIS COMPLETE
-                </p>
-
-                <h2>
-                  Encryption Decision
-                </h2>
-
-              </div>
-
-              <div className="success-badge">
-                ✓ Encrypted Successfully
-              </div>
-
-            </div>
-
-
-            {/* ANALYSIS CARDS */}
-
-            <div className="result-grid">
-
-              {/* FILE */}
-
-              <div className="result-card">
-
-                <span className="card-label">
-                  FILE
-                </span>
-
-                <h3>
-                  {result.filename}
-                </h3>
-
-                <p>
-                  File size:{' '}
-                  {formatBytes(
-                    result.system_features?.file_size_bytes ||
-                    result.sensitivity?.file_size_bytes ||
-                    file?.size
-                  )}
-                </p>
-
-              </div>
-
-
-              {/* CLASSIFICATION */}
-
-              <div className="result-card">
-
-                <span className="card-label">
-                  CLASSIFICATION
-                </span>
-
-                <h3>
-                  {result.classification?.document_category ||
-                    'General'}
-                </h3>
-
-                <p>
-                  Confidence:{' '}
-
-                  {result.classification?.category_confidence != null
-                    ? `${(
-                        result.classification.category_confidence * 100
-                      ).toFixed(0)}%`
-                    : 'N/A'}
-                </p>
-
-              </div>
-
-
-              {/* PII */}
-
-              <div className="result-card">
-
-                <span className="card-label">
-                  PII DETECTED
-                </span>
-
-                <h3>
-                  {result.sensitivity?.pii_count ??
-                    getPiiCount()}
-                </h3>
-
-                <p>
-                  Sensitive information detected
-                </p>
-
-              </div>
-
-
-              {/* SENSITIVITY */}
-
-              <div className="result-card">
-
-                <span className="card-label">
-                  SENSITIVITY
-                </span>
-
-                <h3>
-                  {getSensitivityLevel(
-                    result.sensitivity?.sensitivity_score
-                  )}
-                </h3>
-
-                <p>
-                  Score:{' '}
-                  {result.sensitivity?.sensitivity_score ?? 'N/A'}
-                  /100
-                </p>
-
-              </div>
-
-            </div>
-
-
-            {/* AI DECISION */}
-
-            <div className="policy-card">
-
-              <div className="policy-heading">
-
-                <div className="policy-icon">
-                  AI
-                </div>
-
-                <div>
-
-                  <span className="card-label">
-                    ADAPTIVE POLICY
-                  </span>
-
-                  <h3>
-                    Recommended Encryption
-                  </h3>
-
-                </div>
-
-              </div>
-
-
-              <div className="algorithm">
-
-                <div>
-
-                  <span className="small-label">
-                    ALGORITHM
-                  </span>
-
-                  <strong>
-                    {result.encryption?.algorithm ||
-                      'Not available'}
-                  </strong>
-
-                </div>
-
-
-                <div>
-
-                  <span className="small-label">
-                    SECURITY LEVEL
-                  </span>
-
-                  <div
-                    className={`security-badge ${getSecurityClass(
-                      result.encryption?.security_level
-                    )}`}
-                  >
-                    {result.encryption?.security_level ||
-                      'Standard'}
+            <div className="hero-visual">
+
+              <div className="orbit orbit-one" />
+              <div className="orbit orbit-two" />
+              <div className="orbit orbit-three" />
+
+              <div className="hero-shield">
+                <div className="shield-inner">
+                  <div className="lock">
+                    <div className="lock-top" />
+                    <div className="lock-body">
+                      <span>ΓÇó</span>
+                    </div>
                   </div>
-
                 </div>
-
               </div>
 
-
-              {/* ML CONFIDENCE */}
-
-              <div className="ml-confidence">
-
-                <div>
-
-                  <span className="small-label">
-                    AI MODEL PREDICTION
-                  </span>
-
-                  <strong>
-                    {result.ml_prediction?.algorithm ||
-                      'N/A'}
-                  </strong>
-
-                </div>
-
-                <div>
-
-                  <span className="small-label">
-                    MODEL CONFIDENCE
-                  </span>
-
-                  <strong>
-                    {formatPercent(
-                      result.ml_prediction?.confidence
-                    )}
-                  </strong>
-
-                </div>
-
-              </div>
-
-
-              <div className="reason-box">
-
-                <span>
-                  Why this policy?
-                </span>
-
-                <p>
-                  {result.encryption?.reason ||
-                    'The adaptive AI engine selected this encryption strategy based on the analyzed file characteristics.'}
-                </p>
-
+              <div className="hero-side-text">
+                <span>PRIVACY</span>
+                <span>TODAY</span>
+                <span>SAFER</span>
+                <span>TOMORROW</span>
+                <i />
               </div>
 
             </div>
 
-
-            {/* SENSITIVITY + ENCRYPTION STATUS */}
-
-            <div className="details-grid">
-
-              {/* SENSITIVITY */}
-
-              <div className="details-card">
-
-                <h3>
-                  Sensitivity Analysis
-                </h3>
-
-                <div className="detail-row">
-
-                  <span>
-                    PII Count
-                  </span>
-
-                  <strong>
-                    {result.sensitivity?.pii_count ?? 0}
-                  </strong>
-
-                </div>
-
-                <div className="detail-row">
-
-                  <span>
-                    Confidential Keywords
-                  </span>
-
-                  <strong>
-                    {result.sensitivity
-                      ?.confidential_keyword_count ?? 0}
-                  </strong>
-
-                </div>
-
-                <div className="detail-row">
-
-                  <span>
-                    Confidential Marker
-                  </span>
-
-                  <strong>
-                    {result.sensitivity
-                      ?.confidential_marker || 'N/A'}
-                  </strong>
-
-                </div>
-
-                <div className="detail-row">
-
-                  <span>
-                    Sensitivity Score
-                  </span>
-
-                  <strong>
-                    {result.sensitivity
-                      ?.sensitivity_score ?? 'N/A'}
-                    /100
-                  </strong>
-
-                </div>
-
-                <div className="detail-row">
-
-                  <span>
-                    File Size
-                  </span>
-
-                  <strong>
-                    {formatBytes(
-                      result.sensitivity
-                        ?.file_size_bytes ??
-                      file?.size
-                    )}
-                  </strong>
-
-                </div>
-
-                <div className="detail-row">
-
-                  <span>
-                    Extension
-                  </span>
-
-                  <strong>
-                    {result.sensitivity
-                      ?.file_extension || 'N/A'}
-                  </strong>
-
-                </div>
-
-              </div>
+          </section>
 
 
-              {/* ENCRYPTION STATUS */}
+          {/* DASHBOARD GRID */}
 
-              <div className="details-card">
+          <section className="dashboard-grid">
 
-                <h3>
-                  Encryption Status
-                </h3>
+            <div className="main-column">
 
-                <div className="encryption-status">
+              {/* FEATURE CARDS */}
 
-                  <div className="check-circle">
-                    ✓
+              <div className="feature-grid">
+
+                <div className="feature-card">
+
+                  <div className="feature-icon">
+                    Γ£ú
                   </div>
 
                   <div>
-
-                    <strong>
-                      File encrypted successfully
-                    </strong>
-
+                    <h3>AI Analysis</h3>
                     <p>
-                      {result.encryption?.algorithm}
+                      Detects file sensitivity
+                      <br />
+                      and content type
                     </p>
+                  </div>
 
+                </div>
+
+                <div className="feature-card">
+
+                  <div className="feature-icon">
+                    Γùê
+                  </div>
+
+                  <div>
+                    <h3>Adaptive Encryption</h3>
+                    <p>
+                      Chooses the best algorithm
+                      <br />
+                      automatically
+                    </p>
+                  </div>
+
+                </div>
+
+                <div className="feature-card">
+
+                  <div className="feature-icon">
+                    ≡ƒöÆ
+                  </div>
+
+                  <div>
+                    <h3>Secure Output</h3>
+                    <p>
+                      Your data stays protected
+                      <br />
+                      and private
+                    </p>
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              {/* UPLOAD */}
+
+              <section className="upload-card">
+
+                <div className="upload-heading">
+
+                  <div className="upload-heading-icon">
+                    Γåæ
+                  </div>
+
+                  <div>
+                    <h3>Upload & Analysis</h3>
+                    <p>
+                      Select a file to begin adaptive security analysis.
+                    </p>
                   </div>
 
                 </div>
 
 
-                <div className="encrypted-file">
+                <label className="drop-zone">
 
-                  <span>
-                    Encrypted file
-                  </span>
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+                  />
 
-                  <strong>
-                    {result.encryption?.encrypted_file}
-                  </strong>
+                  <div className="cloud-icon">
+                    Γåæ
+                  </div>
+
+                  {file ? (
+                    <>
+                      <strong>{file.name}</strong>
+                      <span>{formatBytes(file.size)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>Drag and drop your file here</strong>
+                      <span>or click to browse</span>
+                    </>
+                  )}
+
+                  <div className="browse-row">
+
+                    <span className="browse-button">
+                      <span>Γûí</span>
+                      Choose File
+                    </span>
+
+                    {!file && (
+                      <span className="no-file">
+                        No file chosen
+                      </span>
+                    )}
+
+                  </div>
+
+                  <small>
+                    Supported formats: PDF, DOCX, TXT, XLSX,
+                    PNG, JPG (Max 100MB)
+                  </small>
+
+                </label>
+
+
+                {file && (
+                  <div className="selected-file">
+
+                    <div>
+                      <span>SELECTED FILE</span>
+                      <strong>{file.name}</strong>
+                    </div>
+
+                    <span>
+                      {formatBytes(file.size)}
+                    </span>
+
+                  </div>
+                )}
+
+
+                <button
+                  className="analyze-button"
+                  onClick={handleUpload}
+                  disabled={!file || loading}
+                >
+                  {loading
+                    ? 'Analyzing & Encrypting...'
+                    : 'Analyze & Encrypt File'}
+                </button>
+
+
+                {error && (
+                  <div className="error-message">
+                    <strong>Error:</strong> {error}
+                  </div>
+                )}
+
+
+                {/* PROCESS */}
+
+                <div className="process-row">
+
+                  <div className="process-step">
+                    <div className="step-number">1</div>
+                    <div>
+                      <strong>AI Analysis</strong>
+                      <span>Scanning file content...</span>
+                    </div>
+                  </div>
+
+                  <div className="step-arrow">ΓåÆ</div>
+
+                  <div className="process-step">
+                    <div className="step-number">2</div>
+                    <div>
+                      <strong>Adaptive Encryption</strong>
+                      <span>Selecting best algorithm...</span>
+                    </div>
+                  </div>
+
+                  <div className="step-arrow">ΓåÆ</div>
+
+                  <div className="process-step">
+                    <div className="step-number">3</div>
+                    <div>
+                      <strong>Secure Output</strong>
+                      <span>Encrypting and finalizing...</span>
+                    </div>
+                  </div>
 
                 </div>
 
-                <div className="encrypted-file">
-
-                  <span>
-                    Key file
-                  </span>
-
-                  <strong>
-                    {result.encryption?.key_file ||
-                      'Managed securely by backend'}
-                  </strong>
-
-                </div>
-
-              </div>
+              </section>
 
             </div>
 
 
-            {/* PERFORMANCE */}
+            {/* RECENT ACTIVITY */}
 
-            <div className="performance-card">
+            <aside className="activity-card">
 
-              <div className="performance-heading">
+              <div className="activity-header">
+
+                <h3>Recent Activity</h3>
+
+                <button>
+                  View All
+                </button>
+
+              </div>
+
+              <div className="activity-list">
+
+                {recentFiles.map((item) => (
+                  <div
+                    className="activity-item"
+                    key={item.name}
+                  >
+
+                    <div
+                      className={`file-type ${item.type.toLowerCase()}`}
+                    >
+                      {item.type}
+                    </div>
+
+                    <div className="activity-info">
+                      <strong>{item.name}</strong>
+                      <span>
+                        Encrypted ΓÇó {item.time}
+                      </span>
+                    </div>
+
+                    <div className="activity-check">
+                      Γ£ô
+                    </div>
+
+                  </div>
+                ))}
+
+              </div>
+
+            </aside>
+
+          </section>
+
+
+          {/* =================================================
+              RESULTS
+              ================================================= */}
+
+          {result && (
+            <section className="results-section">
+
+              <div className="results-header">
 
                 <div>
+                  <p className="result-eyebrow">
+                    ANALYSIS COMPLETE
+                  </p>
 
-                  <span className="card-label">
-                    PERFORMANCE ANALYSIS
-                  </span>
+                  <h2>Encryption Decision</h2>
+                </div>
 
+                <div className="success-badge">
+                  Γ£ô Encrypted Successfully
+                </div>
+
+              </div>
+
+
+              <div className="result-grid">
+
+                <div className="result-card">
+                  <span>FILE</span>
+                  <h3>{result.filename}</h3>
+                  <p>
+                    File size:{' '}
+                    {formatBytes(
+                      result.system_features?.file_size_bytes ||
+                      result.sensitivity?.file_size_bytes ||
+                      file?.size
+                    )}
+                  </p>
+                </div>
+
+                <div className="result-card">
+                  <span>CLASSIFICATION</span>
                   <h3>
-                    Encryption Performance
+                    {result.classification?.document_category ||
+                      'General'}
                   </h3>
-
+                  <p>
+                    Confidence:{' '}
+                    {result.classification?.category_confidence != null
+                      ? `${(
+                          result.classification.category_confidence * 100
+                        ).toFixed(0)}%`
+                      : 'N/A'}
+                  </p>
                 </div>
 
-                <div className="performance-icon">
-                  ⚡
+                <div className="result-card">
+                  <span>PII DETECTED</span>
+                  <h3>
+                    {result.sensitivity?.pii_count ??
+                      getPiiCount()}
+                  </h3>
+                  <p>
+                    Sensitive information detected
+                  </p>
+                </div>
+
+                <div className="result-card">
+                  <span>SENSITIVITY</span>
+                  <h3>
+                    {getSensitivityLevel(
+                      result.sensitivity?.sensitivity_score
+                    )}
+                  </h3>
+                  <p>
+                    Score:{' '}
+                    {result.sensitivity?.sensitivity_score ??
+                      'N/A'}
+                    /100
+                  </p>
                 </div>
 
               </div>
 
 
-              <div className="performance-grid">
+              {/* POLICY */}
 
-                <div className="performance-item">
+              <div className="policy-card">
 
-                  <span>
-                    Original Size
-                  </span>
+                <div className="policy-title">
 
-                  <strong>
-                    {formatBytes(
-                      result.performance
-                        ?.original_size_bytes
-                    )}
-                  </strong>
+                  <div className="policy-icon">
+                    AI
+                  </div>
+
+                  <div>
+                    <span>ADAPTIVE POLICY</span>
+                    <h3>
+                      Recommended Encryption
+                    </h3>
+                  </div>
+
+                </div>
+
+                <div className="policy-grid">
+
+                  <div>
+                    <small>ALGORITHM</small>
+                    <strong>
+                      {result.encryption?.algorithm ||
+                        'Not available'}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <small>SECURITY LEVEL</small>
+
+                    <div
+                      className={`security-badge ${getSecurityClass(
+                        result.encryption?.security_level
+                      )}`}
+                    >
+                      {result.encryption?.security_level ||
+                        'Standard'}
+                    </div>
+                  </div>
+
+                  <div>
+                    <small>AI MODEL PREDICTION</small>
+                    <strong>
+                      {result.ml_prediction?.algorithm ||
+                        'N/A'}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <small>MODEL CONFIDENCE</small>
+                    <strong>
+                      {formatPercent(
+                        result.ml_prediction?.confidence
+                      )}
+                    </strong>
+                  </div>
+
+                </div>
+
+                <div className="reason-box">
+                  <span>Why this policy?</span>
+
+                  <p>
+                    {result.encryption?.reason ||
+                      'The adaptive AI engine selected this encryption strategy based on the analyzed file characteristics.'}
+                  </p>
+                </div>
+
+              </div>
+
+
+              {/* DETAILS */}
+
+              <div className="details-grid">
+
+                <div className="details-card">
+
+                  <h3>Sensitivity Analysis</h3>
+
+                  <div className="detail-row">
+                    <span>PII Count</span>
+                    <strong>
+                      {result.sensitivity?.pii_count ?? 0}
+                    </strong>
+                  </div>
+
+                  <div className="detail-row">
+                    <span>Confidential Keywords</span>
+                    <strong>
+                      {result.sensitivity
+                        ?.confidential_keyword_count ?? 0}
+                    </strong>
+                  </div>
+
+                  <div className="detail-row">
+                    <span>Confidential Marker</span>
+                    <strong>
+                      {result.sensitivity
+                        ?.confidential_marker || 'N/A'}
+                    </strong>
+                  </div>
+
+                  <div className="detail-row">
+                    <span>Sensitivity Score</span>
+                    <strong>
+                      {result.sensitivity
+                        ?.sensitivity_score ?? 'N/A'}
+                      /100
+                    </strong>
+                  </div>
+
+                  <div className="detail-row">
+                    <span>File Size</span>
+                    <strong>
+                      {formatBytes(
+                        result.sensitivity
+                          ?.file_size_bytes ??
+                        file?.size
+                      )}
+                    </strong>
+                  </div>
+
+                  <div className="detail-row">
+                    <span>Extension</span>
+                    <strong>
+                      {result.sensitivity
+                        ?.file_extension || 'N/A'}
+                    </strong>
+                  </div>
 
                 </div>
 
 
-                <div className="performance-item">
+                <div className="details-card">
 
-                  <span>
-                    Encrypted Size
-                  </span>
+                  <h3>Encryption Status</h3>
 
-                  <strong>
-                    {formatBytes(
-                      result.performance
-                        ?.encrypted_size_bytes
-                    )}
-                  </strong>
+                  <div className="encryption-success">
 
-                </div>
+                    <div className="success-icon">
+                      Γ£ô
+                    </div>
 
+                    <div>
+                      <strong>
+                        File encrypted successfully
+                      </strong>
 
-                <div className="performance-item">
+                      <p>
+                        {result.encryption?.algorithm}
+                      </p>
+                    </div>
 
-                  <span>
-                    Encryption Time
-                  </span>
+                  </div>
 
-                  <strong>
-                    {result.performance
-                      ?.encryption_time_ms ?? 'N/A'} ms
-                  </strong>
+                  <div className="encrypted-file">
+                    <span>Encrypted file</span>
+                    <strong>
+                      {result.encryption?.encrypted_file}
+                    </strong>
+                  </div>
 
-                </div>
-
-
-                <div className="performance-item">
-
-                  <span>
-                    Size Overhead
-                  </span>
-
-                  <strong>
-                    {result.performance
-                      ?.size_overhead_percent ?? 'N/A'}%
-                  </strong>
+                  <div className="encrypted-file">
+                    <span>Key file</span>
+                    <strong>
+                      {result.encryption?.key_file ||
+                        'Managed securely by backend'}
+                    </strong>
+                  </div>
 
                 </div>
 
               </div>
 
-            </div>
 
+              {/* PERFORMANCE */}
 
-            {/* ML PROBABILITIES */}
-
-            {result.ml_prediction?.probabilities && (
-              <div className="probability-card">
+              <div className="performance-card">
 
                 <div>
+                  <span>PERFORMANCE ANALYSIS</span>
+                  <h3>Encryption Performance</h3>
+                </div>
 
-                  <span className="card-label">
-                    AI DECISION ANALYSIS
-                  </span>
+                <div className="performance-grid">
+
+                  <div>
+                    <span>Original Size</span>
+                    <strong>
+                      {formatBytes(
+                        result.performance
+                          ?.original_size_bytes
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Encrypted Size</span>
+                    <strong>
+                      {formatBytes(
+                        result.performance
+                          ?.encrypted_size_bytes
+                      )}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Encryption Time</span>
+                    <strong>
+                      {result.performance
+                        ?.encryption_time_ms ?? 'N/A'} ms
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Size Overhead</span>
+                    <strong>
+                      {result.performance
+                        ?.size_overhead_percent ?? 'N/A'}%
+                    </strong>
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              {/* PROBABILITIES */}
+
+              {result.ml_prediction?.probabilities && (
+                <div className="probability-card">
+
+                  <span>AI DECISION ANALYSIS</span>
 
                   <h3>
                     Model Prediction Probabilities
                   </h3>
 
-                </div>
+                  <div className="probability-list">
 
+                    {Object.entries(
+                      result.ml_prediction.probabilities
+                    ).map(([algorithm, probability]) => (
 
-                <div className="probability-list">
+                      <div
+                        className="probability-row"
+                        key={algorithm}
+                      >
 
-                  {Object.entries(
-                    result.ml_prediction.probabilities
-                  ).map(([algorithm, probability]) => (
+                        <span>{algorithm}</span>
 
-                    <div
-                      className="probability-row"
-                      key={algorithm}
-                    >
+                        <div className="probability-bar">
+                          <div
+                            className="probability-fill"
+                            style={{
+                              width: `${probability * 100}%`,
+                            }}
+                          />
+                        </div>
 
-                      <span>
-                        {algorithm}
-                      </span>
-
-                      <div className="probability-bar">
-
-                        <div
-                          className="probability-fill"
-                          style={{
-                            width: `${probability * 100}%`
-                          }}
-                        />
+                        <strong>
+                          {(probability * 100).toFixed(1)}%
+                        </strong>
 
                       </div>
 
-                      <strong>
-                        {(probability * 100).toFixed(1)}%
-                      </strong>
+                    ))}
 
-                    </div>
-
-                  ))}
+                  </div>
 
                 </div>
-
-              </div>
-            )}
+              )}
 
 
-            {/* DOWNLOAD */}
+              {/* DOWNLOAD */}
 
-            {result.encryption?.encrypted_file && (
-              <a
-                className="download-button"
-                href={`${API_URL}/download/${encodeURIComponent(
-                  result.encryption.encrypted_file
-                )}`}
-              >
-                ↓ Download Encrypted File
-              </a>
-            )}
+              {result.encryption?.encrypted_file && (
+                <a
+                  className="download-button"
+                  href={`${API_URL}/download/${encodeURIComponent(
+                    result.encryption.encrypted_file
+                  )}`}
+                >
+                  Γåô Download Encrypted File
+                </a>
+              )}
 
+            </section>
+          )}
 
-            {/* FAKE HISTORY */}
-
-            <div className="history-card">
-
-              <div className="history-heading">
-
-                <div>
-
-                  <span className="card-label">
-                    ENCRYPTION HISTORY
-                  </span>
-
-                  <h3>
-                    Recent Encryption Activity
-                  </h3>
-
-                </div>
-
-                <span className="demo-badge">
-                  DEMO
-                </span>
-
-              </div>
+        </main>
 
 
-              <div className="history-table">
+        {/* FOOTER */}
 
-                <div className="history-row history-header">
+        <footer className="footer">
 
-                  <span>
-                    File
-                  </span>
+          <span>
+            AI-Based Adaptive Encryption System
+          </span>
 
-                  <span>
-                    Algorithm
-                  </span>
+          <span>
+            Intelligent security ΓÇó Automated policy selection
+          </span>
 
-                  <span>
-                    Security
-                  </span>
+        </footer>
 
-                </div>
-
-
-                <div className="history-row">
-
-                  <span>
-                    test_frontend.txt
-                  </span>
-
-                  <span>
-                    AES-256-GCM
-                  </span>
-
-                  <span className="history-security high-text">
-                    High
-                  </span>
-
-                </div>
-
-
-                <div className="history-row">
-
-                  <span>
-                    grocery.txt
-                  </span>
-
-                  <span>
-                    ChaCha20
-                  </span>
-
-                  <span className="history-security standard-text">
-                    Standard
-                  </span>
-
-                </div>
-
-
-                <div className="history-row">
-
-                  <span>
-                    large_hr.txt
-                  </span>
-
-                  <span>
-                    Hybrid
-                  </span>
-
-                  <span className="history-security very-high-text">
-                    Very High
-                  </span>
-
-                </div>
-
-              </div>
-
-              <p className="history-note">
-                History shown here is currently a static demonstration.
-                Database-backed encryption history will be implemented later.
-              </p>
-
-            </div>
-
-          </section>
-        )}
-
-      </main>
-
-
-      {/* FOOTER */}
-
-      <footer>
-
-        <span>
-          AI-Based Adaptive Encryption System
-        </span>
-
-        <span>
-          Intelligent security • Automated policy selection
-        </span>
-
-      </footer>
+      </div>
 
     </div>
   )
