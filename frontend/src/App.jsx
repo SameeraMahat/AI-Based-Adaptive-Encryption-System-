@@ -169,17 +169,7 @@ function App() {
     <span>Home</span>
   </button>
 
-  <button
-    className="nav-item"
-    onClick={() =>
-      document
-        .querySelector('.upload-card')
-        ?.scrollIntoView({ behavior: 'smooth' })
-    }
-  >
-    <span className="nav-icon">🔐</span>
-    <span>Encrypt</span>
-  </button>
+  
 
   <button
     className="nav-item"

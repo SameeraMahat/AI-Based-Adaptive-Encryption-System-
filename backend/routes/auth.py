@@ -1,79 +1,129 @@
-from flask import Blueprint, request, jsonify
+from datetime import datetime, timezone
 
-from extensions import bcrypt
-from database.models import db, User
+from flask import Blueprint, request, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from database.mongodb import users_collection
+
 
 auth_bp = Blueprint("auth", __name__)
 
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
+    try:
+        data = request.get_json(silent=True) or {}
 
-    data = request.get_json(silent=True)
+        username = data.get("username", "").strip()
+        email = data.get("email", "").strip().lower()
+        password = data.get("password", "")
 
-    if data is None:
-        return jsonify({"error": "Invalid JSON"}), 400
+        if not username or not email or not password:
+            return jsonify({
+                "success": False,
+                "message": "Username, email and password are required."
+            }), 400
 
-    username = data.get("username")
-    email = data.get("email")
-    password = data.get("password")
+        if len(password) < 6:
+            return jsonify({
+                "success": False,
+                "message": "Password must contain at least 6 characters."
+            }), 400
 
-    if not username or not email or not password:
-        return jsonify({"error": "All fields are required."}), 400
+        existing_user = users_collection.find_one({
+            "$or": [
+                {"email": email},
+                {"username": username}
+            ]
+        })
 
-    if User.query.filter_by(username=username).first():
-        return jsonify({"error": "Username already exists."}), 409
+        if existing_user:
+            return jsonify({
+                "success": False,
+                "message": "User with this email or username already exists."
+            }), 409
 
-    if User.query.filter_by(email=email).first():
-        return jsonify({"error": "Email already exists."}), 409
+        now = datetime.now(timezone.utc)
 
-    password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
+        user = {
+            "username": username,
+            "email": email,
+            "password_hash": generate_password_hash(password),
+            "role": "user",
+            "created_at": now,
+            "updated_at": now
+        }
 
-    new_user = User(
-        username=username,
-        email=email,
-        password_hash=password_hash
-    )
+        result = users_collection.insert_one(user)
 
-    db.session.add(new_user)
-    db.session.commit()
+        return jsonify({
+            "success": True,
+            "message": "Registration successful.",
+            "user": {
+                "id": str(result.inserted_id),
+                "username": username,
+                "email": email,
+                "role": "user"
+            }
+        }), 201
 
-    return jsonify({
-        "message": "User registered successfully."
-    }), 201
+    except Exception as error:
+        print("Register error:", error)
+
+        return jsonify({
+            "success": False,
+            "message": "Registration failed."
+        }), 500
 
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
+    try:
+        data = request.get_json(silent=True) or {}
 
-    data = request.get_json(silent=True)
+        email = data.get("email", "").strip().lower()
+        password = data.get("password", "")
 
-    if data is None:
-        return jsonify({"error": "Invalid JSON"}), 400
+        if not email or not password:
+            return jsonify({
+                "success": False,
+                "message": "Email and password are required."
+            }), 400
 
-    username = data.get("username")
-    password = data.get("password")
+        user = users_collection.find_one({
+            "email": email
+        })
 
-    if not username or not password:
+        if not user:
+            return jsonify({
+                "success": False,
+                "message": "Invalid email or password."
+            }), 401
+
+        if not check_password_hash(
+            user.get("password_hash", ""),
+            password
+        ):
+            return jsonify({
+                "success": False,
+                "message": "Invalid email or password."
+            }), 401
+
         return jsonify({
-            "error": "Username and password are required."
-        }), 400
+            "success": True,
+            "message": "Login successful.",
+            "user": {
+                "id": str(user["_id"]),
+                "username": user.get("username", ""),
+                "email": user.get("email", ""),
+                "role": user.get("role", "user")
+            }
+        }), 200
 
-    user = User.query.filter_by(username=username).first()
+    except Exception as error:
+        print("Login error:", error)
 
-    if user is None:
         return jsonify({
-            "error": "Invalid username or password."
-        }), 401
-
-    if not bcrypt.check_password_hash(user.password_hash, password):
-        return jsonify({
-            "error": "Invalid username or password."
-        }), 401
-
-    return jsonify({
-        "message": "Login successful.",
-        "username": user.username,
-        "email": user.email,
-        "role": user.role
-    }), 200
+            "success": False,
+            "message": "Login failed."
+        }), 500
