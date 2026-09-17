@@ -143,7 +143,7 @@ function App() {
         <div className="sidebar-brand">
 
           <div className="shield-logo">
-            <span>Γùå</span>
+            <span>◆</span>
           </div>
 
           <div className="brand-copy">
@@ -157,33 +157,58 @@ function App() {
 
         <nav className="navigation">
 
-          <button className="nav-item active">
-            <span className="nav-icon">Γîé</span>
-            <span>Home</span>
-          </button>
+  <button
+    className="nav-item active"
+    onClick={() =>
+      document
+        .querySelector('.hero')
+        ?.scrollIntoView({ behavior: 'smooth' })
+    }
+  >
+    <span className="nav-icon">🏠</span>
+    <span>Home</span>
+  </button>
 
-          <button className="nav-item">
-            <span className="nav-icon">Γûú</span>
-            <span>Encrypt</span>
-          </button>
+  <button
+    className="nav-item"
+    onClick={() =>
+      document
+        .querySelector('.upload-card')
+        ?.scrollIntoView({ behavior: 'smooth' })
+    }
+  >
+    <span className="nav-icon">🔐</span>
+    <span>Encrypt</span>
+  </button>
 
-          <button className="nav-item">
-            <span className="nav-icon">Γù╖</span>
-            <span>History</span>
-          </button>
+  <button
+    className="nav-item"
+    onClick={() =>
+      document
+        .getElementById('decrypt-section')
+        ?.scrollIntoView({ behavior: 'smooth' })
+    }
+  >
+    <span className="nav-icon">🔓</span>
+    <span>Decrypt</span>
+  </button>
 
-          <button className="nav-item">
-            <span className="nav-icon">ΓûÑ</span>
-            <span>Analytics</span>
-          </button>
+  <button className="nav-item">
+    <span className="nav-icon">🕘</span>
+    <span>History</span>
+  </button>
 
-          <button className="nav-item">
-            <span className="nav-icon">ΓÜÖ</span>
-            <span>Settings</span>
-          </button>
+  <button className="nav-item">
+    <span className="nav-icon">📊</span>
+    <span>Analytics</span>
+  </button>
 
-        </nav>
+  <button className="nav-item">
+    <span className="nav-icon">⚙</span>
+    <span>Settings</span>
+  </button>
 
+</nav>
         <div className="sidebar-bottom">
 
           <div className="sidebar-message">
@@ -202,7 +227,7 @@ function App() {
 
           <div className="version">
             <span>v1.0.0</span>
-            <span>┬⌐ 2025 Adaptive Encryption</span>
+            <span>© 2025 Adaptive Encryption</span>
             <span>All rights reserved.</span>
           </div>
 
@@ -223,7 +248,7 @@ function App() {
 
           <div className="search-box">
 
-            <span className="search-icon">Γîò</span>
+            <span className="search-icon">⌕</span>
 
             <input
               type="text"
@@ -237,7 +262,7 @@ function App() {
           <div className="topbar-actions">
 
             <button className="notification">
-              ΓÖº
+              !
             </button>
 
             <div className="backend-status">
@@ -290,22 +315,32 @@ function App() {
               <div className="orbit orbit-three" />
 
               <div className="hero-shield">
+
                 <div className="shield-inner">
+
                   <div className="lock">
+
                     <div className="lock-top" />
+
                     <div className="lock-body">
-                      <span>ΓÇó</span>
+                      <span>•</span>
                     </div>
+
                   </div>
+
                 </div>
+
               </div>
 
               <div className="hero-side-text">
+
                 <span>PRIVACY</span>
                 <span>TODAY</span>
                 <span>SAFER</span>
                 <span>TOMORROW</span>
+
                 <i />
+
               </div>
 
             </div>
@@ -326,11 +361,12 @@ function App() {
                 <div className="feature-card">
 
                   <div className="feature-icon">
-                    Γ£ú
+                    ✦
                   </div>
 
                   <div>
                     <h3>AI Analysis</h3>
+
                     <p>
                       Detects file sensitivity
                       <br />
@@ -340,14 +376,16 @@ function App() {
 
                 </div>
 
+
                 <div className="feature-card">
 
                   <div className="feature-icon">
-                    Γùê
+                    ⚙
                   </div>
 
                   <div>
                     <h3>Adaptive Encryption</h3>
+
                     <p>
                       Chooses the best algorithm
                       <br />
@@ -357,14 +395,16 @@ function App() {
 
                 </div>
 
+
                 <div className="feature-card">
 
                   <div className="feature-icon">
-                    ≡ƒöÆ
+                    🔒
                   </div>
 
                   <div>
                     <h3>Secure Output</h3>
+
                     <p>
                       Your data stays protected
                       <br />
@@ -384,11 +424,12 @@ function App() {
                 <div className="upload-heading">
 
                   <div className="upload-heading-icon">
-                    Γåæ
+                    ⇧
                   </div>
 
                   <div>
                     <h3>Upload & Analysis</h3>
+
                     <p>
                       Select a file to begin adaptive security analysis.
                     </p>
@@ -402,11 +443,11 @@ function App() {
                   <input
                     type="file"
                     onChange={handleFileChange}
-                    accept=".pdf,.docx,.txt,.png,.jpg,.jpeg"
+                    accept=".pdf,.docx,.txt,.xlsx,.png,.jpg,.jpeg"
                   />
 
                   <div className="cloud-icon">
-                    Γåæ
+                    ⇧
                   </div>
 
                   {file ? (
@@ -416,15 +457,20 @@ function App() {
                     </>
                   ) : (
                     <>
-                      <strong>Drag and drop your file here</strong>
-                      <span>or click to browse</span>
+                      <strong>
+                        Drag and drop your file here
+                      </strong>
+
+                      <span>
+                        or click to browse
+                      </span>
                     </>
                   )}
 
                   <div className="browse-row">
 
                     <span className="browse-button">
-                      <span>Γûí</span>
+                      <span>□</span>
                       Choose File
                     </span>
 
@@ -449,7 +495,10 @@ function App() {
 
                     <div>
                       <span>SELECTED FILE</span>
-                      <strong>{file.name}</strong>
+
+                      <strong>
+                        {file.name}
+                      </strong>
                     </div>
 
                     <span>
@@ -483,31 +532,56 @@ function App() {
                 <div className="process-row">
 
                   <div className="process-step">
-                    <div className="step-number">1</div>
+
+                    <div className="step-number">
+                      1
+                    </div>
+
                     <div>
                       <strong>AI Analysis</strong>
-                      <span>Scanning file content...</span>
+                      <span>
+                        Scanning file content...
+                      </span>
                     </div>
+
                   </div>
 
-                  <div className="step-arrow">ΓåÆ</div>
+                  <div className="step-arrow">
+                    →
+                  </div>
 
                   <div className="process-step">
-                    <div className="step-number">2</div>
+
+                    <div className="step-number">
+                      2
+                    </div>
+
                     <div>
                       <strong>Adaptive Encryption</strong>
-                      <span>Selecting best algorithm...</span>
+                      <span>
+                        Selecting best algorithm...
+                      </span>
                     </div>
+
                   </div>
 
-                  <div className="step-arrow">ΓåÆ</div>
+                  <div className="step-arrow">
+                    →
+                  </div>
 
                   <div className="process-step">
-                    <div className="step-number">3</div>
+
+                    <div className="step-number">
+                      3
+                    </div>
+
                     <div>
                       <strong>Secure Output</strong>
-                      <span>Encrypting and finalizing...</span>
+                      <span>
+                        Encrypting and finalizing...
+                      </span>
                     </div>
+
                   </div>
 
                 </div>
@@ -534,6 +608,7 @@ function App() {
               <div className="activity-list">
 
                 {recentFiles.map((item) => (
+
                   <div
                     className="activity-item"
                     key={item.name}
@@ -546,17 +621,23 @@ function App() {
                     </div>
 
                     <div className="activity-info">
-                      <strong>{item.name}</strong>
+
+                      <strong>
+                        {item.name}
+                      </strong>
+
                       <span>
-                        Encrypted ΓÇó {item.time}
+                        Encrypted • {item.time}
                       </span>
+
                     </div>
 
                     <div className="activity-check">
-                      Γ£ô
+                      ✓
                     </div>
 
                   </div>
+
                 ))}
 
               </div>
@@ -571,30 +652,42 @@ function App() {
               ================================================= */}
 
           {result && (
+
             <section className="results-section">
 
               <div className="results-header">
 
                 <div>
+
                   <p className="result-eyebrow">
                     ANALYSIS COMPLETE
                   </p>
 
-                  <h2>Encryption Decision</h2>
+                  <h2>
+                    Encryption Decision
+                  </h2>
+
                 </div>
 
                 <div className="success-badge">
-                  Γ£ô Encrypted Successfully
+                  ✓ Encrypted Successfully
                 </div>
 
               </div>
 
 
+              {/* RESULT GRID */}
+
               <div className="result-grid">
 
                 <div className="result-card">
+
                   <span>FILE</span>
-                  <h3>{result.filename}</h3>
+
+                  <h3>
+                    {result.filename}
+                  </h3>
+
                   <p>
                     File size:{' '}
                     {formatBytes(
@@ -603,48 +696,66 @@ function App() {
                       file?.size
                     )}
                   </p>
+
                 </div>
 
+
                 <div className="result-card">
+
                   <span>CLASSIFICATION</span>
+
                   <h3>
                     {result.classification?.document_category ||
                       'General'}
                   </h3>
+
                   <p>
                     Confidence:{' '}
+
                     {result.classification?.category_confidence != null
                       ? `${(
                           result.classification.category_confidence * 100
                         ).toFixed(0)}%`
                       : 'N/A'}
                   </p>
+
                 </div>
 
+
                 <div className="result-card">
+
                   <span>PII DETECTED</span>
+
                   <h3>
                     {result.sensitivity?.pii_count ??
                       getPiiCount()}
                   </h3>
+
                   <p>
                     Sensitive information detected
                   </p>
+
                 </div>
 
+
                 <div className="result-card">
+
                   <span>SENSITIVITY</span>
+
                   <h3>
                     {getSensitivityLevel(
                       result.sensitivity?.sensitivity_score
                     )}
                   </h3>
+
                   <p>
                     Score:{' '}
+
                     {result.sensitivity?.sensitivity_score ??
                       'N/A'}
                     /100
                   </p>
+
                 </div>
 
               </div>
@@ -661,26 +772,41 @@ function App() {
                   </div>
 
                   <div>
-                    <span>ADAPTIVE POLICY</span>
+
+                    <span>
+                      ADAPTIVE POLICY
+                    </span>
+
                     <h3>
                       Recommended Encryption
                     </h3>
+
                   </div>
 
                 </div>
 
+
                 <div className="policy-grid">
 
                   <div>
-                    <small>ALGORITHM</small>
+
+                    <small>
+                      ALGORITHM
+                    </small>
+
                     <strong>
                       {result.encryption?.algorithm ||
                         'Not available'}
                     </strong>
+
                   </div>
 
+
                   <div>
-                    <small>SECURITY LEVEL</small>
+
+                    <small>
+                      SECURITY LEVEL
+                    </small>
 
                     <div
                       className={`security-badge ${getSecurityClass(
@@ -690,34 +816,52 @@ function App() {
                       {result.encryption?.security_level ||
                         'Standard'}
                     </div>
+
                   </div>
 
+
                   <div>
-                    <small>AI MODEL PREDICTION</small>
+
+                    <small>
+                      AI MODEL PREDICTION
+                    </small>
+
                     <strong>
                       {result.ml_prediction?.algorithm ||
                         'N/A'}
                     </strong>
+
                   </div>
 
+
                   <div>
-                    <small>MODEL CONFIDENCE</small>
+
+                    <small>
+                      MODEL CONFIDENCE
+                    </small>
+
                     <strong>
                       {formatPercent(
                         result.ml_prediction?.confidence
                       )}
                     </strong>
+
                   </div>
 
                 </div>
 
+
                 <div className="reason-box">
-                  <span>Why this policy?</span>
+
+                  <span>
+                    Why this policy?
+                  </span>
 
                   <p>
                     {result.encryption?.reason ||
                       'The adaptive AI engine selected this encryption strategy based on the analyzed file characteristics.'}
                   </p>
+
                 </div>
 
               </div>
@@ -729,42 +873,73 @@ function App() {
 
                 <div className="details-card">
 
-                  <h3>Sensitivity Analysis</h3>
+                  <h3>
+                    Sensitivity Analysis
+                  </h3>
+
 
                   <div className="detail-row">
-                    <span>PII Count</span>
+
+                    <span>
+                      PII Count
+                    </span>
+
                     <strong>
                       {result.sensitivity?.pii_count ?? 0}
                     </strong>
+
                   </div>
 
+
                   <div className="detail-row">
-                    <span>Confidential Keywords</span>
+
+                    <span>
+                      Confidential Keywords
+                    </span>
+
                     <strong>
                       {result.sensitivity
                         ?.confidential_keyword_count ?? 0}
                     </strong>
+
                   </div>
 
+
                   <div className="detail-row">
-                    <span>Confidential Marker</span>
+
+                    <span>
+                      Confidential Marker
+                    </span>
+
                     <strong>
                       {result.sensitivity
                         ?.confidential_marker || 'N/A'}
                     </strong>
+
                   </div>
 
+
                   <div className="detail-row">
-                    <span>Sensitivity Score</span>
+
+                    <span>
+                      Sensitivity Score
+                    </span>
+
                     <strong>
                       {result.sensitivity
                         ?.sensitivity_score ?? 'N/A'}
                       /100
                     </strong>
+
                   </div>
 
+
                   <div className="detail-row">
-                    <span>File Size</span>
+
+                    <span>
+                      File Size
+                    </span>
+
                     <strong>
                       {formatBytes(
                         result.sensitivity
@@ -772,14 +947,21 @@ function App() {
                         file?.size
                       )}
                     </strong>
+
                   </div>
 
+
                   <div className="detail-row">
-                    <span>Extension</span>
+
+                    <span>
+                      Extension
+                    </span>
+
                     <strong>
                       {result.sensitivity
                         ?.file_extension || 'N/A'}
                     </strong>
+
                   </div>
 
                 </div>
@@ -787,15 +969,19 @@ function App() {
 
                 <div className="details-card">
 
-                  <h3>Encryption Status</h3>
+                  <h3>
+                    Encryption Status
+                  </h3>
+
 
                   <div className="encryption-success">
 
                     <div className="success-icon">
-                      Γ£ô
+                      ✓
                     </div>
 
                     <div>
+
                       <strong>
                         File encrypted successfully
                       </strong>
@@ -803,23 +989,36 @@ function App() {
                       <p>
                         {result.encryption?.algorithm}
                       </p>
+
                     </div>
 
                   </div>
 
+
                   <div className="encrypted-file">
-                    <span>Encrypted file</span>
+
+                    <span>
+                      Encrypted file
+                    </span>
+
                     <strong>
                       {result.encryption?.encrypted_file}
                     </strong>
+
                   </div>
 
+
                   <div className="encrypted-file">
-                    <span>Key file</span>
+
+                    <span>
+                      Key file
+                    </span>
+
                     <strong>
                       {result.encryption?.key_file ||
                         'Managed securely by backend'}
                     </strong>
+
                   </div>
 
                 </div>
@@ -832,46 +1031,77 @@ function App() {
               <div className="performance-card">
 
                 <div>
-                  <span>PERFORMANCE ANALYSIS</span>
-                  <h3>Encryption Performance</h3>
+
+                  <span>
+                    PERFORMANCE ANALYSIS
+                  </span>
+
+                  <h3>
+                    Encryption Performance
+                  </h3>
+
                 </div>
+
 
                 <div className="performance-grid">
 
                   <div>
-                    <span>Original Size</span>
+
+                    <span>
+                      Original Size
+                    </span>
+
                     <strong>
                       {formatBytes(
                         result.performance
                           ?.original_size_bytes
                       )}
                     </strong>
+
                   </div>
 
+
                   <div>
-                    <span>Encrypted Size</span>
+
+                    <span>
+                      Encrypted Size
+                    </span>
+
                     <strong>
                       {formatBytes(
                         result.performance
                           ?.encrypted_size_bytes
                       )}
                     </strong>
+
                   </div>
 
+
                   <div>
-                    <span>Encryption Time</span>
+
+                    <span>
+                      Encryption Time
+                    </span>
+
                     <strong>
                       {result.performance
                         ?.encryption_time_ms ?? 'N/A'} ms
                     </strong>
+
                   </div>
 
+
                   <div>
-                    <span>Size Overhead</span>
+
+                    <span>
+                      Size Overhead
+                    </span>
+
                     <strong>
                       {result.performance
                         ?.size_overhead_percent ?? 'N/A'}%
                     </strong>
+
                   </div>
 
                 </div>
@@ -882,13 +1112,17 @@ function App() {
               {/* PROBABILITIES */}
 
               {result.ml_prediction?.probabilities && (
+
                 <div className="probability-card">
 
-                  <span>AI DECISION ANALYSIS</span>
+                  <span>
+                    AI DECISION ANALYSIS
+                  </span>
 
                   <h3>
                     Model Prediction Probabilities
                   </h3>
+
 
                   <div className="probability-list">
 
@@ -901,15 +1135,19 @@ function App() {
                         key={algorithm}
                       >
 
-                        <span>{algorithm}</span>
+                        <span>
+                          {algorithm}
+                        </span>
 
                         <div className="probability-bar">
+
                           <div
                             className="probability-fill"
                             style={{
                               width: `${probability * 100}%`,
                             }}
                           />
+
                         </div>
 
                         <strong>
@@ -923,23 +1161,27 @@ function App() {
                   </div>
 
                 </div>
+
               )}
 
 
               {/* DOWNLOAD */}
 
               {result.encryption?.encrypted_file && (
+
                 <a
                   className="download-button"
                   href={`${API_URL}/download/${encodeURIComponent(
                     result.encryption.encrypted_file
                   )}`}
                 >
-                  Γåô Download Encrypted File
+                  ↓ Download Encrypted File
                 </a>
+
               )}
 
             </section>
+
           )}
 
         </main>
@@ -954,7 +1196,7 @@ function App() {
           </span>
 
           <span>
-            Intelligent security ΓÇó Automated policy selection
+            Intelligent security • Automated policy selection
           </span>
 
         </footer>

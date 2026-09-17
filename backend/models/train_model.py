@@ -3,112 +3,98 @@ import joblib
 import pandas as pd
 
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
+    balanced_accuracy_score,
+    f1_score,
     classification_report,
     confusion_matrix
 )
-from sklearn.model_selection import (
-    train_test_split,
-    RandomizedSearchCV
+
+
+# ============================================================
+# PATH CONFIGURATION
+# ============================================================
+
+BASE_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
 )
-
-
-# ============================================================
-# PATHS
-# ============================================================
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DATASET_PATH = os.path.join(
     BASE_DIR,
     "dataset",
-    "encryption_dataset_v2.csv"
+    "encryption_dataset_adaptive.csv"
 )
-
-MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MODEL_PATH = os.path.join(
-    MODEL_DIR,
-    "rf_model.pkl"
-)
-
-ENCODER_PATH = os.path.join(
-    MODEL_DIR,
-    "label_encoders.pkl"
+    BASE_DIR,
+    "models",
+    "encryption_model.pkl"
 )
 
 
 # ============================================================
-# CONFIGURATION
+# FEATURES
 # ============================================================
-
-# IMPORTANT:
-# CPU and RAM are NOT used because they describe machine state,
-# not document characteristics.
 
 FEATURE_COLUMNS = [
-    "file_type",
-    "file_size_mb",
-    "document_category",
-    "pii_count",
-    "category_confidence",
-    "confidential_marker",
-    "sensitivity_score"
+    "sensitivity_score",
+    "file_size_mb"
 ]
 
 TARGET_COLUMN = "algorithm"
-
-CATEGORICAL_COLUMNS = [
-    "file_type",
-    "document_category",
-    "confidential_marker"
-]
 
 
 # ============================================================
 # LOAD DATASET
 # ============================================================
 
-print("\n================================")
-print("LOADING DATASET")
-print("================================")
+print()
+print("=" * 60)
+print("ADAPTIVE ENCRYPTION ML TRAINING")
+print("=" * 60)
+
+print()
+print("Dataset:")
+print(DATASET_PATH)
+
 
 if not os.path.exists(DATASET_PATH):
+
     raise FileNotFoundError(
         f"Dataset not found: {DATASET_PATH}"
     )
 
-df = pd.read_csv(DATASET_PATH)
 
-print("Dataset loaded successfully.")
-print("Dataset shape:", df.shape)
-
-print("\nFirst 5 rows:")
-print(df.head())
+df = pd.read_csv(
+    DATASET_PATH
+)
 
 
 # ============================================================
 # DATASET INFORMATION
 # ============================================================
 
-print("\n================================")
-print("DATASET COLUMNS")
-print("================================")
+print()
+print("Dataset Shape:")
+print(df.shape)
 
-print(df.columns.tolist())
-
-print("\nAlgorithm distribution:")
-print(df[TARGET_COLUMN].value_counts())
+print()
+print("Dataset Columns:")
+print(list(df.columns))
 
 
 # ============================================================
-# CHECK REQUIRED COLUMNS
+# VALIDATE REQUIRED COLUMNS
 # ============================================================
 
-required_columns = FEATURE_COLUMNS + [TARGET_COLUMN]
+required_columns = (
+    FEATURE_COLUMNS
+    + [TARGET_COLUMN]
+)
 
 missing_columns = [
     column
@@ -116,227 +102,237 @@ missing_columns = [
     if column not in df.columns
 ]
 
+
 if missing_columns:
+
     raise ValueError(
-        f"Missing required columns: {missing_columns}"
+        "Missing required columns: "
+        + ", ".join(missing_columns)
     )
 
 
 # ============================================================
-# SELECT FEATURES AND TARGET
+# CLEAN DATA
 # ============================================================
 
-X = df[FEATURE_COLUMNS].copy()
-y = df[TARGET_COLUMN].copy()
+df = df[
+    required_columns
+].copy()
 
 
-# ============================================================
-# DATA CLEANING
-# ============================================================
-
-print("\n================================")
-print("DATA CLEANING")
-print("================================")
-
-rows_before = len(X)
-
-# Remove rows where target is missing
-valid_rows = y.notna()
-
-X = X.loc[valid_rows].copy()
-y = y.loc[valid_rows].copy()
-
-# Remove rows where required features are missing
-valid_rows = X.notna().all(axis=1)
-
-X = X.loc[valid_rows].copy()
-y = y.loc[valid_rows].copy()
-
-print("Rows before cleaning:", rows_before)
-print("Rows after cleaning :", len(X))
-
-
-# ============================================================
-# FIX DATA TYPES
-# ============================================================
-
-# Convert numeric columns explicitly.
-
-NUMERIC_COLUMNS = [
-    "file_size_mb",
-    "pii_count",
-    "category_confidence",
-    "sensitivity_score"
-]
-
-for column in NUMERIC_COLUMNS:
-    X[column] = pd.to_numeric(
-        X[column],
-        errors="coerce"
-    )
-
-# Remove rows that became invalid after numeric conversion.
-valid_rows = X[NUMERIC_COLUMNS].notna().all(axis=1)
-
-X = X.loc[valid_rows].copy()
-y = y.loc[valid_rows].copy()
-
-
-# ============================================================
-# ENCODE CATEGORICAL FEATURES
-# ============================================================
-
-print("\n================================")
-print("ENCODING CATEGORICAL FEATURES")
-print("================================")
-
-encoders = {}
-
-for column in CATEGORICAL_COLUMNS:
-
-    encoder = LabelEncoder()
-
-    # Convert source column to string first.
-    values = X[column].astype(str)
-
-    # Encode to integers.
-    encoded_values = encoder.fit_transform(values)
-
-    # IMPORTANT:
-    # Assign a numeric Series instead of assigning integers
-    # directly into pandas StringDtype column.
-    X[column] = pd.Series(
-        encoded_values,
-        index=X.index,
-        dtype="int64"
-    )
-
-    encoders[column] = encoder
-
-    print(f"\n{column}:")
-    for index, value in enumerate(encoder.classes_):
-        print(f"  {index} = {value}")
-
-
-# ============================================================
-# ENCODE TARGET
-# ============================================================
-
-print("\n================================")
-print("ENCODING TARGET")
-print("================================")
-
-target_encoder = LabelEncoder()
-
-y_encoded = target_encoder.fit_transform(
-    y.astype(str)
+df["sensitivity_score"] = pd.to_numeric(
+    df["sensitivity_score"],
+    errors="coerce"
 )
 
-encoders["algorithm"] = target_encoder
+df["file_size_mb"] = pd.to_numeric(
+    df["file_size_mb"],
+    errors="coerce"
+)
 
-print("\nAlgorithm classes:")
 
-for index, algorithm in enumerate(
-    target_encoder.classes_
-):
-    print(f"  {index} = {algorithm}")
+df = df.dropna()
 
 
 # ============================================================
-# FINAL FEATURE CHECK
+# DISPLAY ALGORITHM DISTRIBUTION
 # ============================================================
 
-print("\n================================")
-print("FINAL FEATURES")
-print("================================")
+print()
+print("Algorithm Distribution:")
+print(
+    df[TARGET_COLUMN]
+    .value_counts()
+)
 
-print(X.dtypes)
 
-print("\nFeature columns:")
-for column in FEATURE_COLUMNS:
-    print("-", column)
+# ============================================================
+# DISPLAY ADAPTIVE RULE
+# ============================================================
 
-print("\nTarget:")
-print("-", TARGET_COLUMN)
+print()
+print("-" * 60)
+print("ADAPTIVE ENCRYPTION RULE")
+print("-" * 60)
+
+print(
+    "Sensitivity <= 20              -> ChaCha20"
+)
+
+print(
+    "Sensitivity 21-50              -> AES"
+)
+
+print(
+    "Sensitivity > 50 + Size >= 5MB -> Hybrid"
+)
+
+print(
+    "Sensitivity > 50 + Size < 5MB  -> AES"
+)
+
+
+# ============================================================
+# FEATURES AND TARGET
+# ============================================================
+
+X = df[
+    FEATURE_COLUMNS
+]
+
+y = df[
+    TARGET_COLUMN
+]
 
 
 # ============================================================
 # TRAIN / TEST SPLIT
 # ============================================================
 
-print("\n================================")
-print("TRAIN / TEST SPLIT")
-print("================================")
-
 X_train, X_test, y_train, y_test = train_test_split(
+
     X,
-    y_encoded,
+    y,
+
     test_size=0.20,
+
     random_state=42,
-    stratify=y_encoded
+
+    stratify=y
 )
 
-print("Training samples:", len(X_train))
-print("Testing samples :", len(X_test))
+
+print()
+print("Training Samples:")
+print(len(X_train))
+
+print()
+print("Testing Samples:")
+print(len(X_test))
 
 
 # ============================================================
-# RANDOM FOREST
+# RANDOM FOREST MODEL
 # ============================================================
-
-print("\n================================")
-print("RANDOM FOREST TRAINING")
-print("================================")
 
 model = RandomForestClassifier(
-    n_estimators=500,
-    max_depth=None,
-    min_samples_split=2,
+
+    n_estimators=300,
+
+    max_depth=12,
+
     min_samples_leaf=1,
-    max_features="sqrt",
-    class_weight="balanced_subsample",
+
     random_state=42,
+
+    class_weight="balanced",
+
     n_jobs=-1
 )
-print("Training Random Forest...")
+
+
+# ============================================================
+# TRAIN MODEL
+# ============================================================
+
+print()
+print("-" * 60)
+print("TRAINING RANDOM FOREST")
+print("-" * 60)
 
 model.fit(
     X_train,
     y_train
 )
 
+
 print("Training completed.")
 
 
 # ============================================================
-# MODEL EVALUATION
+# PREDICTION
 # ============================================================
 
-print("\n================================")
-print("MODEL EVALUATION")
-print("================================")
+y_pred = model.predict(
+    X_test
+)
 
-y_pred = model.predict(X_test)
+
+# ============================================================
+# PROBABILITIES
+# ============================================================
+
+y_probability = model.predict_proba(
+    X_test
+)
+
+
+# ============================================================
+# EVALUATION
+# ============================================================
 
 accuracy = accuracy_score(
     y_test,
     y_pred
 )
 
-print(f"Accuracy: {accuracy:.4f}")
 
-print("\nClassification Report:")
+balanced_accuracy = balanced_accuracy_score(
+    y_test,
+    y_pred
+)
+
+
+macro_f1 = f1_score(
+    y_test,
+    y_pred,
+    average="macro"
+)
+
+
+print()
+print("=" * 60)
+print("MODEL PERFORMANCE")
+print("=" * 60)
+
+print()
+print(
+    f"Accuracy: {accuracy:.4f}"
+)
+
+print(
+    f"Balanced Accuracy: {balanced_accuracy:.4f}"
+)
+
+print(
+    f"Macro F1 Score: {macro_f1:.4f}"
+)
+
+
+# ============================================================
+# CLASSIFICATION REPORT
+# ============================================================
+
+print()
+print("Classification Report:")
+print()
 
 print(
     classification_report(
         y_test,
         y_pred,
-        target_names=target_encoder.classes_,
-        zero_division=0
+        digits=4
     )
 )
 
-print("\nConfusion Matrix:")
+
+# ============================================================
+# CONFUSION MATRIX
+# ============================================================
+
+print()
+print("Confusion Matrix:")
+print()
 
 print(
     confusion_matrix(
@@ -350,67 +346,70 @@ print(
 # FEATURE IMPORTANCE
 # ============================================================
 
-print("\n================================")
+print()
+print("-" * 60)
 print("FEATURE IMPORTANCE")
-print("================================")
+print("-" * 60)
 
 feature_importance = pd.DataFrame({
-    "feature": FEATURE_COLUMNS,
-    "importance": model.feature_importances_
+
+    "feature":
+        FEATURE_COLUMNS,
+
+    "importance":
+        model.feature_importances_
+
 })
 
-feature_importance = feature_importance.sort_values(
-    by="importance",
-    ascending=False
+
+feature_importance = (
+    feature_importance
+    .sort_values(
+        by="importance",
+        ascending=False
+    )
 )
 
-print(feature_importance.to_string(index=False))
+
+print(
+    feature_importance.to_string(
+        index=False
+    )
+)
+
+
+# ============================================================
+# MODEL CLASSES
+# ============================================================
+
+print()
+print("Model Classes:")
+
+print(
+    model.classes_
+)
 
 
 # ============================================================
 # SAVE MODEL
 # ============================================================
 
-print("\n================================")
-print("SAVING MODEL")
-print("================================")
-
 joblib.dump(
     model,
     MODEL_PATH
 )
 
-joblib.dump(
-    encoders,
-    ENCODER_PATH
+
+print()
+print("=" * 60)
+print("MODEL SAVED")
+print("=" * 60)
+
+print()
+print(
+    f"Saved to: {MODEL_PATH}"
 )
 
-print("Model saved to:")
-print(MODEL_PATH)
-
-print("\nEncoders saved to:")
-print(ENCODER_PATH)
-
-
-# ============================================================
-# FINAL SUMMARY
-# ============================================================
-
-print("\n================================")
-print("TRAINING COMPLETE")
-print("================================")
-
-print(f"Dataset rows      : {len(X)}")
-print(f"Training samples  : {len(X_train)}")
-print(f"Testing samples   : {len(X_test)}")
-print(f"Accuracy          : {accuracy:.4f}")
-
-print("\nPredicted algorithms:")
-
-for algorithm in target_encoder.classes_:
-    print("-", algorithm)
-
-print("\nGenerated files:")
-
-print("-", MODEL_PATH)
-print("-", ENCODER_PATH)
+print()
+print("Training completed successfully.")
+print()
