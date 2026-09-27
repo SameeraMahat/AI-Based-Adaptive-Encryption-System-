@@ -1,23 +1,28 @@
 import os
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
+
+from cryptography.hazmat.primitives.ciphers.aead import (
+    ChaCha20Poly1305
+)
 
 
 def generate_key():
     """
-    Generate a 256-bit ChaCha20 encryption key.
+    Generate a 256-bit ChaCha20-Poly1305 encryption key.
     """
-    return os.urandom(32)
+    return ChaCha20Poly1305.generate_key()
 
 
 def encrypt_file(input_path, output_path, key):
     """
-    Encrypt a file using ChaCha20.
+    Encrypt a file using ChaCha20-Poly1305.
 
-    The output file contains:
-        16-byte nonce + encrypted data
+    Output format:
+
+        12-byte nonce
+        encrypted data + authentication tag
 
     Returns:
-        nonce: the nonce used for encryption
+        nonce: randomly generated nonce
     """
 
     if not os.path.exists(input_path):
@@ -27,24 +32,24 @@ def encrypt_file(input_path, output_path, key):
 
     if len(key) != 32:
         raise ValueError(
-            "ChaCha20 key must be exactly 32 bytes."
+            "ChaCha20-Poly1305 key must be exactly 32 bytes."
         )
 
-    # ChaCha20 requires a 16-byte nonce
-    nonce = os.urandom(16)
-
-    algorithm = algorithms.ChaCha20(
-        key,
-        nonce
-    )
-
-    cipher = Cipher(algorithm, mode=None)
-    encryptor = cipher.encryptor()
+    # ChaCha20-Poly1305 uses a 12-byte nonce.
+    nonce = os.urandom(12)
 
     with open(input_path, "rb") as file:
         plaintext = file.read()
 
-    ciphertext = encryptor.update(plaintext)
+    cipher = ChaCha20Poly1305(key)
+
+    # ChaCha20-Poly1305 automatically adds
+    # an authentication tag to the ciphertext.
+    ciphertext = cipher.encrypt(
+        nonce,
+        plaintext,
+        None
+    )
 
     with open(output_path, "wb") as file:
         file.write(nonce)
@@ -55,7 +60,10 @@ def encrypt_file(input_path, output_path, key):
 
 def decrypt_file(input_path, output_path, key):
     """
-    Decrypt a ChaCha20 encrypted file.
+    Decrypt a ChaCha20-Poly1305 encrypted file.
+
+    A wrong key will raise an exception because
+    the authentication tag will not be valid.
     """
 
     if not os.path.exists(input_path):
@@ -65,25 +73,33 @@ def decrypt_file(input_path, output_path, key):
 
     if len(key) != 32:
         raise ValueError(
-            "ChaCha20 key must be exactly 32 bytes."
+            "ChaCha20-Poly1305 key must be exactly 32 bytes."
         )
 
     with open(input_path, "rb") as file:
         encrypted_data = file.read()
 
-    # First 16 bytes contain the nonce
-    nonce = encrypted_data[:16]
-    ciphertext = encrypted_data[16:]
+    # 12-byte nonce + authentication tag
+    if len(encrypted_data) < 12 + 16:
+        raise ValueError(
+            "Invalid ChaCha20-Poly1305 encrypted file."
+        )
 
-    algorithm = algorithms.ChaCha20(
-        key,
-        nonce
+    # First 12 bytes contain the nonce.
+    nonce = encrypted_data[:12]
+
+    # Remaining bytes contain ciphertext + authentication tag.
+    ciphertext = encrypted_data[12:]
+
+    cipher = ChaCha20Poly1305(key)
+
+    # This verifies the authentication tag.
+    # Wrong key -> exception.
+    plaintext = cipher.decrypt(
+        nonce,
+        ciphertext,
+        None
     )
-
-    cipher = Cipher(algorithm, mode=None)
-    decryptor = cipher.decryptor()
-
-    plaintext = decryptor.update(ciphertext)
 
     with open(output_path, "wb") as file:
         file.write(plaintext)

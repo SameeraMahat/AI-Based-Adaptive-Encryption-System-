@@ -1,11 +1,16 @@
 # Python
 venv/
+
+# Python cache
 __pycache__/
 *.pyc
 
 # Environment
 backend/.env
 .env
+
+# Temporary decrypted files
+backend/temp_decrypted/
 
 # Database
 *.sqlite3
@@ -33,3 +38,9 @@ AdaptiveEncryptionAI/backend/uploads/
 
 # Local backup
 AdaptiveEncryptionAI_backup/
+
+# Python virtual environment
+.venv/
+
+# Temporary decrypted files
+backend/temp_decrypted/

@@ -67,6 +67,16 @@ from encryption.hybrid import (
 
 
 # ============================================================
+# ENCRYPTION DATABASE
+# ============================================================
+
+from routes.dashboard import (
+    save_encryption_record,
+    DEMO_USER_ID
+)
+
+
+# ============================================================
 # BLUEPRINT
 # ============================================================
 
@@ -431,143 +441,63 @@ def upload_file():
         print("-" * 60)
 
         print(
-            "ML Prediction:",
+            "Predicted Algorithm:",
             predicted_algorithm
         )
 
         print(
-            "ML Display Algorithm:",
-            ml_prediction.get(
-                "display_algorithm"
-            )
+            "Confidence:",
+            f"{ml_confidence * 100:.2f}%"
         )
 
         print(
-            "ML Confidence:",
-            ml_confidence
-        )
-
-        print(
-            "ML Probabilities:",
+            "Probabilities:",
             ml_probabilities
         )
 
-        print(
-            "Decision Source:",
-            ml_prediction.get(
-                "decision_source",
-                "Random Forest ML Model"
-            )
-        )
-
 
         # ====================================================
-        # 12. ML SAFETY VALIDATION
+        # 12. VALIDATE ML PREDICTION
         # ====================================================
-
-        validation_status = "Approved"
-
-        decision_source = (
-            "Random Forest ML Model"
-        )
-
-
-        # ----------------------------------------------------
-        # Validate algorithm
-        # ----------------------------------------------------
 
         if predicted_algorithm not in SUPPORTED_ALGORITHMS:
 
-            print(
-                "ML Safety Validation: FAILED"
-            )
-
             return jsonify({
-                "error": (
-                    "Unsupported ML prediction: "
-                    f"{predicted_algorithm}"
-                ),
-
-                "ml_prediction": ml_prediction,
-
-                "validation_status": "Rejected"
-
-            }), 422
+                "error":
+                    "ML model returned an unsupported "
+                    "encryption algorithm."
+            }), 500
 
 
-        # ----------------------------------------------------
-        # Validate confidence
-        # ----------------------------------------------------
+        # ====================================================
+        # 13. CONFIDENCE VALIDATION
+        # ====================================================
 
         if ml_confidence < CONFIDENCE_THRESHOLD:
 
-            print(
-                "ML Safety Validation: FAILED"
-            )
-
-            print(
-                "Reason: ML confidence below threshold"
-            )
+            validation_status = "Rejected"
 
             return jsonify({
 
                 "error":
-                    "ML prediction confidence is too low "
-                    "for safe encryption.",
+                    "ML confidence is below the required "
+                    "security threshold.",
 
-                "ml_prediction":
-                    ml_prediction,
+                "confidence":
+                    ml_confidence,
 
-                "confidence_threshold":
-                    CONFIDENCE_THRESHOLD,
+                "threshold":
+                    CONFIDENCE_THRESHOLD
 
-                "validation_status":
-                    "Rejected"
+            }), 400
 
-            }), 422
+        else:
 
-
-        # ----------------------------------------------------
-        # Validation successful
-        # ----------------------------------------------------
-
-        print(
-            "ML Safety Validation:",
-            validation_status
-        )
-
-        print(
-            "Final Decision Source:",
-            decision_source
-        )
+            validation_status = "Approved"
 
 
         # ====================================================
-        # 13. ENCRYPTED FILE PATH
-        # ====================================================
-
-        encrypted_filename = (
-            filename + ".enc"
-        )
-
-
-        encrypted_path = os.path.join(
-            ENCRYPTED_FOLDER,
-            encrypted_filename
-        )
-
-
-        # ====================================================
-        # 14. KEY VARIABLES
-        # ====================================================
-
-        key_path = None
-
-        public_key_path = None
-
-
-        # ====================================================
-        # 15. ENCRYPTION METADATA
+        # 14. FINAL ENCRYPTION DECISION
         # ====================================================
 
         encryption_algorithm = (
@@ -584,26 +514,44 @@ def upload_file():
         )
 
 
+        decision_source = "ML Model"
+
+
         reason = (
-            "Random Forest ML model selected "
-            f"{encryption_algorithm} based on the "
-            "extracted file, system, PII, classification, "
-            "and sensitivity features."
+            "Encryption algorithm selected "
+            "automatically using the adaptive "
+            "machine learning model."
         )
 
 
         # ====================================================
-        # 16. START ENCRYPTION TIMER
+        # 15. ENCRYPTED FILE PATH
         # ====================================================
 
-        encryption_start = (
-            time.perf_counter()
+        encrypted_filename = (
+            f"{filename}.enc"
         )
+
+
+        encrypted_path = os.path.join(
+            ENCRYPTED_FOLDER,
+            encrypted_filename
+        )
+
+
+        # ====================================================
+        # 16. ENCRYPTION TIMER
+        # ====================================================
+
+        encryption_start = time.perf_counter()
 
 
         # ====================================================
         # 17. AES-256-GCM
         # ====================================================
+
+        key_path = None
+        public_key_path = None
 
         if predicted_algorithm == "AES":
 
@@ -812,6 +760,62 @@ def upload_file():
                 encryption_algorithm
 
         }
+
+
+        # ====================================================
+        # SAVE ENCRYPTION DATABASE RECORD
+        # ====================================================
+
+        save_encryption_record(
+
+            user_id=DEMO_USER_ID,
+
+            filename=filename,
+
+            file_type=system_features.get(
+                "file_type"
+            ),
+
+            file_size_mb=system_features.get(
+                "file_size_mb"
+            ),
+
+            pii_count=sensitivity.get(
+                "pii_count",
+                0
+            ),
+
+            sensitivity_score=sensitivity.get(
+                "sensitivity_score",
+                0
+            ),
+
+            document_category=classification.get(
+                "document_category",
+                "General"
+            ),
+
+            ml_algorithm=predicted_algorithm,
+
+            ml_confidence=ml_confidence,
+
+            security_validation=validation_status,
+
+            encryption_algorithm=encryption_algorithm,
+
+            key_size=(
+                "AES-256 + RSA-2048"
+                if predicted_algorithm == "Hybrid"
+                else "256-bit"
+            ),
+
+            processing_time_ms=round(
+                encryption_time_ms,
+                2
+            ),
+
+            status="Success"
+        )
 
 
         # ====================================================
