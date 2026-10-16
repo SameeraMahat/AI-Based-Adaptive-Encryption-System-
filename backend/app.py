@@ -9,6 +9,7 @@ from routes.auth import auth_bp
 from routes.upload import upload_bp
 from routes.decrypt import decrypt_bp
 from routes.history import history_bp
+from routes.analytics import analytics_bp
 from routes.dashboard import dashboard_bp
 
 
@@ -80,6 +81,15 @@ def create_app():
 
     app.register_blueprint(
         history_bp,
+        url_prefix="/api"
+    )
+
+    # ========================================================
+    # ANALYTICS
+    # ========================================================
+
+    app.register_blueprint(
+        analytics_bp,
         url_prefix="/api"
     )
 

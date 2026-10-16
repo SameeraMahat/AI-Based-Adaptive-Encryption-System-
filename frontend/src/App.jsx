@@ -1,6 +1,8 @@
 ﻿import { useState } from 'react'
 import './App.css'
 import DecryptPage from './DecryptPage'
+import HistoryPage from './HistoryPage'
+import AnalyticsPage from './AnalyticsPage'
 
 const API_URL = 'http://127.0.0.1:5000/api'
 
@@ -189,7 +191,12 @@ function App() {
             <span>History</span>
           </button>
 
-          <button className="nav-item">
+          <button
+            className={`nav-item ${
+              activePage === 'analytics' ? 'active' : ''
+            }`}
+            onClick={() => setActivePage('analytics')}
+          >
             <span className="nav-icon">📊</span>
             <span>Analytics</span>
           </button>
@@ -277,12 +284,9 @@ function App() {
           {activePage === 'decrypt' ? (
             <DecryptPage onNavigate={setActivePage} />
           ) : activePage === 'history' ? (
-            <div className="placeholder-page">
-              <h1>History</h1>
-              <p>
-                Decryption and encryption history will appear here.
-              </p>
-            </div>
+            <HistoryPage onNavigate={setActivePage} />
+          ) : activePage === 'analytics' ? (
+            <AnalyticsPage onNavigate={setActivePage} />
           ) : (
             <>
 
