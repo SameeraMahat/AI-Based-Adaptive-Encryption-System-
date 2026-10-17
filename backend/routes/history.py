@@ -4,7 +4,7 @@ import math
 import re
 from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify, request, session
 
 from database.mongodb import (
     encryption_history_collection,
@@ -12,19 +12,10 @@ from database.mongodb import (
 )
 
 from utils.helpers import as_utc, iso_utc
+from auth_utils import login_required
 
 
-history_bp = Blueprint(
-    "history",
-    __name__
-)
-
-
-# ============================================================
-# TEMPORARY USER ID
-# ============================================================
-
-DEMO_USER_ID = "demo-user"
+history_bp = Blueprint("history", __name__)
 
 
 # ============================================================
@@ -46,8 +37,12 @@ RANGE_DAYS = {
 # HELPERS
 # ============================================================
 
-def get_file_type(filename):
+def get_current_user_id():
+    """Return the ID of the authenticated user."""
+    return str(session["user_id"])
 
+
+def get_file_type(filename):
     if not filename or "." not in filename:
         return "N/A"
 
@@ -55,7 +50,6 @@ def get_file_type(filename):
 
 
 def get_sensitivity_level(score):
-
     if score is None:
         return "N/A"
 
@@ -72,7 +66,6 @@ def get_sensitivity_level(score):
 
 
 def normalise_encryption(record):
-
     score = record.get("sensitivity_score")
 
     return {
@@ -100,7 +93,6 @@ def normalise_encryption(record):
 
 
 def normalise_decryption(record):
-
     return {
         "id": str(record["_id"]),
         "type": "decryption",
@@ -124,8 +116,8 @@ def normalise_decryption(record):
 
 def date_filter_from_request():
     """
-    Returns a MongoDB created_at filter (or None) from the
-    ?range= query parameter.
+    Return a MongoDB created_at filter based on ?range=.
+    An unsupported range means no date restriction.
     """
 
     selected = request.args.get("range", "all").lower()
@@ -141,9 +133,12 @@ def date_filter_from_request():
     return {"$gte": since}
 
 
-def base_query(created_filter):
+def base_query(created_filter, user_id):
+    """
+    Every history query must be restricted to the current user.
+    """
 
-    query = {"user_id": DEMO_USER_ID}
+    query = {"user_id": str(user_id)}
 
     if created_filter:
         query["created_at"] = created_filter
@@ -151,28 +146,25 @@ def base_query(created_filter):
     return query
 
 
-def load_items(record_type):
+def load_items(record_type, user_id):
     """
-    Load, normalise and filter history items according to the
-    current request. Returns a newest-first list.
+    Load and filter history records for one authenticated user.
     """
 
     created_filter = date_filter_from_request()
-    query = base_query(created_filter)
+    query = base_query(created_filter, user_id)
 
     items = []
 
     if record_type in ("all", "encryption"):
-
         for record in encryption_history_collection.find(query):
             items.append(normalise_encryption(record))
 
     if record_type in ("all", "decryption"):
-
         for record in decryption_history_collection.find(query):
             items.append(normalise_decryption(record))
 
-    # ---------------- search ----------------
+    # ---------------- Search ----------------
 
     search = request.args.get("search", "").strip().lower()
 
@@ -184,7 +176,7 @@ def load_items(record_type):
             or search in (item["document_category"] or "").lower()
         ]
 
-    # ---------------- algorithm ----------------
+    # ---------------- Algorithm filter ----------------
 
     algorithm = request.args.get("algorithm", "").strip()
 
@@ -194,7 +186,7 @@ def load_items(record_type):
             if item["algorithm"] == algorithm
         ]
 
-    # ---------------- status ----------------
+    # ---------------- Status filter ----------------
 
     status = request.args.get("status", "").strip().lower()
 
@@ -204,7 +196,7 @@ def load_items(record_type):
             if (item["status"] or "").lower() == status
         ]
 
-    # ---------------- sort ----------------
+    # ---------------- Sorting ----------------
 
     newest_first = request.args.get("sort", "newest") != "oldest"
 
@@ -217,7 +209,6 @@ def load_items(record_type):
 
 
 def get_record_type():
-
     record_type = request.args.get("type", "all").lower()
 
     if record_type not in ("all", "encryption", "decryption"):
@@ -227,7 +218,6 @@ def get_record_type():
 
 
 def parse_int(value, default, minimum, maximum):
-
     try:
         number = int(value)
     except (TypeError, ValueError):
@@ -236,17 +226,40 @@ def parse_int(value, default, minimum, maximum):
     return max(minimum, min(maximum, number))
 
 
+def load_all_for_filters(user_id):
+    """Return algorithms used by this user only."""
+
+    items = []
+    query = {"user_id": str(user_id)}
+
+    for record in encryption_history_collection.find(
+        query,
+        {"encryption_algorithm": 1}
+    ):
+        items.append({
+            "algorithm": record.get("encryption_algorithm")
+        })
+
+    for record in decryption_history_collection.find(
+        query,
+        {"algorithm": 1}
+    ):
+        items.append({
+            "algorithm": record.get("algorithm")
+        })
+
+    return items
+
+
 # ============================================================
 # COMBINED HISTORY
 # ============================================================
 
-@history_bp.route(
-    "/history",
-    methods=["GET"]
-)
+@history_bp.route("/history", methods=["GET"])
+@login_required
 def get_history():
     """
-    Combined encryption + decryption history.
+    Combined encryption and decryption history.
 
     Query parameters:
         type       all | encryption | decryption
@@ -260,10 +273,10 @@ def get_history():
     """
 
     try:
-
+        user_id = get_current_user_id()
         record_type = get_record_type()
 
-        items = load_items(record_type)
+        items = load_items(record_type, user_id)
 
         page_size = parse_int(
             request.args.get("page_size"),
@@ -288,12 +301,15 @@ def get_history():
 
         start = (page - 1) * page_size
 
-        # Counts for the tabs ignore the type filter.
+        # Counts for the tabs ignore the selected type filter,
+        # but still belong only to the logged-in user.
         counts = {
-            "encryption": encryption_history_collection
-            .count_documents({"user_id": DEMO_USER_ID}),
-            "decryption": decryption_history_collection
-            .count_documents({"user_id": DEMO_USER_ID})
+            "encryption": encryption_history_collection.count_documents({
+                "user_id": user_id
+            }),
+            "decryption": decryption_history_collection.count_documents({
+                "user_id": user_id
+            })
         }
 
         counts["all"] = (
@@ -302,7 +318,7 @@ def get_history():
 
         algorithms = sorted({
             item["algorithm"]
-            for item in load_all_for_filters()
+            for item in load_all_for_filters(user_id)
             if item["algorithm"]
         })
 
@@ -318,7 +334,6 @@ def get_history():
         }), 200
 
     except Exception as error:
-
         print("History error:", repr(error))
 
         return jsonify({
@@ -327,42 +342,12 @@ def get_history():
         }), 500
 
 
-def load_all_for_filters():
-    """
-    Algorithms available for the filter dropdown.
-    """
-
-    items = []
-
-    query = {"user_id": DEMO_USER_ID}
-
-    for record in encryption_history_collection.find(
-        query,
-        {"encryption_algorithm": 1, "filename": 1}
-    ):
-        items.append({
-            "algorithm": record.get("encryption_algorithm")
-        })
-
-    for record in decryption_history_collection.find(
-        query,
-        {"algorithm": 1, "filename": 1}
-    ):
-        items.append({
-            "algorithm": record.get("algorithm")
-        })
-
-    return items
-
-
 # ============================================================
 # CSV EXPORT
 # ============================================================
 
 def csv_safe(value):
-    """
-    Stop spreadsheet formula injection from file names.
-    """
+    """Prevent spreadsheet formula injection through file names."""
 
     if isinstance(value, str) and re.match(r"^[=+\-@\t\r]", value):
         return "'" + value
@@ -370,15 +355,12 @@ def csv_safe(value):
     return value
 
 
-@history_bp.route(
-    "/history/export",
-    methods=["GET"]
-)
+@history_bp.route("/history/export", methods=["GET"])
+@login_required
 def export_history():
-
     try:
-
-        items = load_items(get_record_type())
+        user_id = get_current_user_id()
+        items = load_items(get_record_type(), user_id)
 
         buffer = io.StringIO()
         writer = csv.writer(buffer)
@@ -417,13 +399,11 @@ def export_history():
             buffer.getvalue(),
             mimetype="text/csv",
             headers={
-                "Content-Disposition":
-                    "attachment; filename=history.csv"
+                "Content-Disposition": "attachment; filename=history.csv"
             }
         )
 
     except Exception as error:
-
         print("History export error:", repr(error))
 
         return jsonify({
@@ -433,33 +413,39 @@ def export_history():
 
 
 # ============================================================
-# BACKWARD COMPATIBLE: UPLOAD HISTORY
+# BACKWARD-COMPATIBLE UPLOAD HISTORY
 # ============================================================
 
-@history_bp.route(
-    "/history/uploads",
-    methods=["GET"]
-)
+@history_bp.route("/history/uploads", methods=["GET"])
+@login_required
 def get_uploaded_file_history():
+    try:
+        user_id = get_current_user_id()
 
-    records = (
-        encryption_history_collection
-        .find({"user_id": DEMO_USER_ID})
-        .sort("created_at", -1)
-    )
-
-    history = []
-
-    for record in records:
-
-        record["id"] = str(record.pop("_id"))
-        record["created_at"] = iso_utc(
-            record.get("created_at")
+        records = (
+            encryption_history_collection
+            .find({"user_id": user_id})
+            .sort("created_at", -1)
         )
 
-        history.append(record)
+        history = []
 
-    return jsonify({
-        "success": True,
-        "history": history
-    }), 200
+        for record in records:
+            record["id"] = str(record.pop("_id"))
+            record["created_at"] = iso_utc(
+                record.get("created_at")
+            )
+            history.append(record)
+
+        return jsonify({
+            "success": True,
+            "history": history
+        }), 200
+
+    except Exception as error:
+        print("Upload history error:", repr(error))
+
+        return jsonify({
+            "success": False,
+            "error": "Unable to load upload history."
+        }), 500

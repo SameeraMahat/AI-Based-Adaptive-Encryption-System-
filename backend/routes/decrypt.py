@@ -1,57 +1,49 @@
+import os
+import base64
+import time
+import tempfile
+import shutil
+
+from datetime import datetime, timezone
+
 from flask import (
     Blueprint,
     request,
     jsonify,
-    send_file
+    send_file,
+    session,
+    current_app
 )
 
-import os
-import base64
-import time
-import traceback
-
-from datetime import datetime, timezone
-
+from werkzeug.security import check_password_hash
+from werkzeug.utils import secure_filename
 from cryptography.hazmat.primitives import serialization
 
 from database.mongodb import (
+    users_collection,
     decryption_history_collection,
     encryption_history_collection
 )
 
-# AES
+from auth_utils import login_required
+
 from encryption.aes import (
     decrypt_file as aes_decrypt_file
 )
 
-# ChaCha20
 from encryption.chacha20 import (
     decrypt_file as chacha_decrypt_file
 )
 
-# Hybrid
 from encryption.hybrid import (
     decrypt_file as hybrid_decrypt_file,
     load_private_key
 )
 
-# Stored symmetric key
-from encryption.key_manager import (
-    load_key
-)
+from encryption.key_manager import load_key
 
 
-decrypt_bp = Blueprint(
-    "decrypt",
-    __name__
-)
-
-
-# ============================================================
-# TEMPORARY USER ID
-# ============================================================
-
-DEMO_USER_ID = "demo-user"
+decrypt_bp = Blueprint("decrypt", __name__)
 
 
 # ============================================================
@@ -59,16 +51,93 @@ DEMO_USER_ID = "demo-user"
 # ============================================================
 
 AES_ALGORITHM = "AES-256-GCM"
-
 CHACHA_ALGORITHM = "ChaCha20-Poly1305"
+HYBRID_ALGORITHM = "Hybrid AES-256-GCM + RSA-OAEP"
 
-HYBRID_ALGORITHM = (
-    "Hybrid AES-256-GCM + RSA-OAEP"
-)
+
+def normalize_algorithm(algorithm):
+    """Convert saved algorithm names into consistent names."""
+
+    if not algorithm:
+        return None
+
+    value = str(algorithm).strip().lower()
+
+    if value in {"aes", "aes-256-gcm"}:
+        return AES_ALGORITHM
+
+    if value in {
+        "chacha20",
+        "chacha20-poly1305"
+    }:
+        return CHACHA_ALGORITHM
+
+    if value in {
+        "hybrid",
+        "hybrid aes-256-gcm + rsa-oaep",
+        "aes-256-gcm + rsa-oaep"
+    }:
+        return HYBRID_ALGORITHM
+
+    return None
 
 
 # ============================================================
-# SAVE DECRYPTION DATABASE RECORD
+# PASSWORD CONFIRMATION
+# ============================================================
+
+def verify_current_user_password(password):
+    """
+    Verify the submitted password against the password hash
+    belonging to the currently authenticated user.
+    """
+
+    user_id = session.get("user_id")
+    email = session.get("email")
+
+    if not user_id or not email or not password:
+        return False
+
+    user = users_collection.find_one({
+        "email": email
+    })
+
+    if not user:
+        return False
+
+    # Prevent a session from being used if it no longer
+    # matches the account ID stored in the database.
+    if str(user.get("_id")) != str(user_id):
+        return False
+
+    password_hash = user.get("password_hash")
+
+    if not password_hash:
+        return False
+
+    try:
+        return check_password_hash(
+            password_hash,
+            password
+        )
+    except (ValueError, TypeError):
+        return False
+
+
+# ============================================================
+# USER-SPECIFIC KEY IDENTIFIER
+# ============================================================
+
+def get_key_identifier(user_id, original_filename):
+    """
+    Must match the identifier used by the updated upload.py.
+    """
+
+    return f"{user_id}_{original_filename}"
+
+
+# ============================================================
+# SAVE DECRYPTION HISTORY
 # ============================================================
 
 def save_decryption_record(
@@ -79,13 +148,8 @@ def save_decryption_record(
     processing_time_ms,
     status
 ):
-    """
-    Save successful decryption information
-    into MongoDB.
-    """
-
-    decryption_record = {
-        "user_id": user_id,
+    record = {
+        "user_id": str(user_id),
         "filename": filename,
         "algorithm": algorithm,
         "key_type": key_type,
@@ -94,9 +158,8 @@ def save_decryption_record(
         "created_at": datetime.now(timezone.utc)
     }
 
-    result = (
-        decryption_history_collection
-        .insert_one(decryption_record)
+    result = decryption_history_collection.insert_one(
+        record
     )
 
     return result.inserted_id
@@ -107,18 +170,11 @@ def save_decryption_record(
 # ============================================================
 
 def serialize_decryption_record(record):
+    record["id"] = str(record.pop("_id"))
 
-    record["id"] = str(
-        record.pop("_id")
-    )
-
-    if isinstance(
-        record.get("created_at"),
-        datetime
-    ):
+    if isinstance(record.get("created_at"), datetime):
         record["created_at"] = (
-            record["created_at"]
-            .isoformat()
+            record["created_at"].isoformat()
         )
 
     return record
@@ -132,28 +188,20 @@ def serialize_decryption_record(record):
     "/decrypt/history",
     methods=["GET"]
 )
+@login_required
 def get_decryption_history():
+    user_id = str(session["user_id"])
 
     records = (
         decryption_history_collection
-        .find({
-            "user_id": DEMO_USER_ID
-        })
-        .sort(
-            "created_at",
-            -1
-        )
+        .find({"user_id": user_id})
+        .sort("created_at", -1)
     )
 
-    history = []
-
-    for record in records:
-
-        history.append(
-            serialize_decryption_record(
-                record
-            )
-        )
+    history = [
+        serialize_decryption_record(record)
+        for record in records
+    ]
 
     return jsonify({
         "success": True,
@@ -162,30 +210,18 @@ def get_decryption_history():
 
 
 # ============================================================
-# GET ENCRYPTION METADATA
+# GET USER'S ENCRYPTION RECORD
 # ============================================================
 
-def get_encryption_record(filename):
+def get_encryption_record(user_id, filename):
     """
-    Get the original encryption record for the file.
-
-    MongoDB stores the original filename,
-    for example:
-
-        mindmap.pdf
-
-    while the encrypted file is:
-
-        mindmap.pdf.enc
+    Retrieve metadata only if it belongs to this user.
     """
 
-    return (
-        encryption_history_collection
-        .find_one({
-            "user_id": DEMO_USER_ID,
-            "filename": filename
-        })
-    )
+    return encryption_history_collection.find_one({
+        "user_id": str(user_id),
+        "filename": filename
+    })
 
 
 # ============================================================
@@ -193,70 +229,23 @@ def get_encryption_record(filename):
 # ============================================================
 
 def load_stored_decryption_key(
-    original_filename,
+    key_identifier,
     encryption_algorithm
 ):
-    """
-    Load the correct server-side key according
-    to the algorithm used during encryption.
-
-    AES / ChaCha20:
-        backend/keys/<filename>.key
-
-    Hybrid:
-        backend/keys/hybrid/<filename>.private.pem
-
-    The exact file locations are handled by the
-    existing key_manager / hybrid modules.
-    """
-
-    # --------------------------------------------------------
-    # AES-256-GCM
-    # --------------------------------------------------------
-
-    if encryption_algorithm == AES_ALGORITHM:
-
-        stored_key = load_key(
-            original_filename
-        )
-
+    if encryption_algorithm in {
+        AES_ALGORITHM,
+        CHACHA_ALGORITHM
+    }:
         return (
-            stored_key,
+            load_key(key_identifier),
             "256-bit symmetric key"
         )
-
-
-    # --------------------------------------------------------
-    # ChaCha20-Poly1305
-    # --------------------------------------------------------
-
-    if encryption_algorithm == CHACHA_ALGORITHM:
-
-        stored_key = load_key(
-            original_filename
-        )
-
-        return (
-            stored_key,
-            "256-bit symmetric key"
-        )
-
-
-    # --------------------------------------------------------
-    # Hybrid AES-256-GCM + RSA-OAEP
-    # --------------------------------------------------------
 
     if encryption_algorithm == HYBRID_ALGORITHM:
-
-        private_key = load_private_key(
-            original_filename
-        )
-
         return (
-            private_key,
+            load_private_key(key_identifier),
             "RSA-2048 private key"
         )
-
 
     raise ValueError(
         "Unsupported encryption algorithm."
@@ -264,7 +253,7 @@ def load_stored_decryption_key(
 
 
 # ============================================================
-# SEND SUCCESSFUL DECRYPTED FILE
+# CREATE DECRYPTED FILE RESPONSE
 # ============================================================
 
 def create_decryption_response(
@@ -272,11 +261,6 @@ def create_decryption_response(
     original_filename,
     algorithm
 ):
-    """
-    Create the decrypted-file response and expose
-    the actual algorithm to the frontend.
-    """
-
     response = send_file(
         decrypted_out_path,
         as_attachment=True,
@@ -284,37 +268,35 @@ def create_decryption_response(
         mimetype="application/octet-stream"
     )
 
-    response.headers[
-        "X-Decryption-Algorithm"
-    ] = algorithm
-
-    response.headers[
-        "X-Decryption-Status"
-    ] = "Success"
-
-    response.headers[
-        "X-Original-Filename"
-    ] = original_filename
+    response.headers["X-Decryption-Algorithm"] = algorithm
+    response.headers["X-Decryption-Status"] = "Success"
+    response.headers["X-Original-Filename"] = original_filename
 
     return response
 
 
 # ============================================================
-# CLEANUP HELPER
+# CLEANUP HELPERS
 # ============================================================
 
 def cleanup_file(file_path):
-
-    if not file_path:
-        return
-
-    if os.path.exists(file_path):
-
+    if file_path and os.path.isfile(file_path):
         try:
             os.remove(file_path)
+        except OSError:
+            current_app.logger.warning(
+                "Could not remove a temporary file."
+            )
 
-        except Exception:
-            pass
+
+def cleanup_directory(directory):
+    if directory and os.path.isdir(directory):
+        try:
+            shutil.rmtree(directory)
+        except OSError:
+            current_app.logger.warning(
+                "Could not remove a temporary directory."
+            )
 
 
 # ============================================================
@@ -325,834 +307,460 @@ def cleanup_file(file_path):
     "/decrypt",
     methods=["POST"]
 )
+@login_required
 def decrypt_file():
 
-    # ========================================================
-    # CHECK ENCRYPTED FILE
-    # ========================================================
+    # --------------------------------------------------------
+    # 1. CONFIRM PASSWORD
+    # --------------------------------------------------------
 
-    if "file" not in request.files:
+    password = request.form.get("password", "")
 
+    if not password:
         return jsonify({
-            "error":
-                "Encrypted file is required."
+            "success": False,
+            "error": "Please enter your login password to confirm decryption."
         }), 400
 
+    if not verify_current_user_password(password):
+        return jsonify({
+            "success": False,
+            "error": "Incorrect password. Decryption was not performed."
+        }), 401
+
+    user_id = str(session["user_id"])
+
+    # --------------------------------------------------------
+    # 2. VALIDATE ENCRYPTED FILE
+    # --------------------------------------------------------
+
+    if "file" not in request.files:
+        return jsonify({
+            "success": False,
+            "error": "Encrypted file is required."
+        }), 400
 
     enc_file = request.files["file"]
 
-
     if not enc_file.filename:
-
         return jsonify({
-            "error":
-                "Encrypted file name is missing."
+            "success": False,
+            "error": "Encrypted file name is missing."
         }), 400
 
+    encrypted_filename = secure_filename(
+        os.path.basename(enc_file.filename)
+    )
 
-    # ========================================================
-    # DETERMINE KEY SOURCE
-    # ========================================================
+    if not encrypted_filename.lower().endswith(".enc"):
+        return jsonify({
+            "success": False,
+            "error": "Unsupported encrypted file. Select a .enc file."
+        }), 400
+
+    original_filename = encrypted_filename[:-4]
+
+    if not original_filename:
+        return jsonify({
+            "success": False,
+            "error": "Invalid encrypted filename."
+        }), 400
+
+    # --------------------------------------------------------
+    # 3. VALIDATE KEY SOURCE
+    # --------------------------------------------------------
 
     key_source = request.form.get(
         "key_source",
         "upload"
     ).strip().lower()
 
-
-    if key_source not in {
-        "upload",
-        "stored"
-    }:
-
+    if key_source not in {"upload", "stored"}:
         return jsonify({
-            "error":
-                "Invalid key source."
+            "success": False,
+            "error": "Invalid key source."
         }), 400
-
-
-    # ========================================================
-    # VALIDATE UPLOADED KEY
-    # ========================================================
 
     key_file = None
 
     if key_source == "upload":
-
         if "key" not in request.files:
-
             return jsonify({
-                "error":
-                    "Key file is required."
+                "success": False,
+                "error": "Please upload the decryption key."
             }), 400
 
         key_file = request.files["key"]
 
         if not key_file.filename:
-
             return jsonify({
-                "error":
-                    "Key file name is missing."
+                "success": False,
+                "error": "The key filename is missing."
             }), 400
 
+    # --------------------------------------------------------
+    # 4. CREATE A UNIQUE TEMPORARY DIRECTORY
+    # --------------------------------------------------------
 
-    # ========================================================
-    # TEMP DIRECTORY
-    # ========================================================
-
-    temp_dir = os.path.join(
-        os.getcwd(),
-        "temp_decrypted"
+    temp_dir = tempfile.mkdtemp(
+        prefix="decrypt_"
     )
-
-    os.makedirs(
-        temp_dir,
-        exist_ok=True
-    )
-
-
-    # ========================================================
-    # SAFE ENCRYPTED FILE NAME
-    # ========================================================
-
-    encrypted_filename = os.path.basename(
-        enc_file.filename
-    )
-
-
-    if not encrypted_filename.lower().endswith(
-        ".enc"
-    ):
-
-        return jsonify({
-            "error":
-                "Unsupported encrypted file."
-        }), 400
-
-
-    # ========================================================
-    # TEMP ENCRYPTED FILE
-    # ========================================================
 
     temp_enc_path = os.path.join(
         temp_dir,
-        encrypted_filename
+        "encrypted_input.enc"
     )
-
-
-    # ========================================================
-    # ORIGINAL FILE NAME
-    # ========================================================
-
-    original_filename = (
-        encrypted_filename[:-4]
-    )
-
 
     decrypted_out_path = os.path.join(
         temp_dir,
         original_filename
     )
 
-
-    # ========================================================
-    # START TIMER
-    # ========================================================
+    keep_temp_dir = False
 
     decryption_start = time.perf_counter()
 
-
-    # These variables are populated depending
-    # on the selected key source.
-
-    encryption_algorithm = None
-    key_type = None
-
-    symmetric_key = None
-    private_key = None
-
-    uploaded_raw_key = None
-
-    response = None
-
-
     try:
+        # ----------------------------------------------------
+        # 5. SAVE ENCRYPTED FILE TEMPORARILY
+        # ----------------------------------------------------
 
-        # ====================================================
-        # SAVE ENCRYPTED FILE TEMPORARILY
-        # ====================================================
+        enc_file.save(temp_enc_path)
 
-        enc_file.save(
-            temp_enc_path
+        # ----------------------------------------------------
+        # 6. GET THE CURRENT USER'S ENCRYPTION RECORD
+        # ----------------------------------------------------
+
+        encryption_record = get_encryption_record(
+            user_id,
+            original_filename
         )
 
+        # Ownership check: both stored-key and uploaded-key modes
+        # require an encryption record that belongs to this user.
+        if not encryption_record:
+            return jsonify({
+                "success": False,
+                "error": (
+                    "This encrypted file is not registered to your account. "
+                    "You cannot decrypt it from this account."
+                )
+            }), 403
 
-        # ====================================================
-        # GET ENCRYPTION RECORD
-        # ====================================================
-
-        encryption_record = (
-            get_encryption_record(
-                original_filename
-            )
-        )
-
+        encryption_algorithm = None
 
         if encryption_record:
-
-            encryption_algorithm = (
-                encryption_record.get(
-                    "encryption_algorithm"
-                )
+            encryption_algorithm = normalize_algorithm(
+                encryption_record.get("encryption_algorithm")
             )
 
+            saved_algorithm = encryption_record.get(
+                "encryption_algorithm"
+            )
 
-        # ====================================================
-        # STORED KEY MODE
-        # ====================================================
+            if saved_algorithm and not encryption_algorithm:
+                return jsonify({
+                    "success": False,
+                    "error": "The saved encryption algorithm is unsupported."
+                }), 400
+
+        # ----------------------------------------------------
+        # 7. STORED KEY MODE
+        # ----------------------------------------------------
+
+        symmetric_key = None
+        private_key = None
+        key_type = None
+
+        key_identifier = get_key_identifier(
+            user_id,
+            original_filename
+        )
 
         if key_source == "stored":
 
-            # ------------------------------------------------
-            # Encryption record is required because the
-            # backend must know which stored key belongs
-            # to this encrypted file.
-            # ------------------------------------------------
-
             if not encryption_record:
-
                 return jsonify({
-                    "error":
-                        "No encryption record was found "
-                        "for this file. The stored key "
-                        "cannot be located."
+                    "success": False,
+                    "error": (
+                        "No encryption record belonging to your account "
+                        "was found for this file."
+                    )
                 }), 404
 
-
             if not encryption_algorithm:
-
                 return jsonify({
-                    "error":
-                        "Encryption algorithm information "
-                        "is missing for this file."
-                }), 500
-
-
-            # ------------------------------------------------
-            # Load exact server-side key
-            # ------------------------------------------------
+                    "success": False,
+                    "error": (
+                        "The encryption algorithm is missing "
+                        "or unsupported in the saved record."
+                    )
+                }), 400
 
             try:
-
                 stored_key, key_type = (
                     load_stored_decryption_key(
-                        original_filename,
+                        key_identifier,
                         encryption_algorithm
                     )
                 )
 
             except FileNotFoundError:
-
                 return jsonify({
-                    "error":
-                        "The stored decryption key "
-                        "could not be found on the server."
+                    "success": False,
+                    "error": (
+                        "The stored decryption key was not found. "
+                        "The key may have been saved using an older "
+                        "storage path."
+                    )
                 }), 404
 
-            except ValueError as error:
-
-                return jsonify({
-                    "error":
-                        str(error)
-                }), 400
-
-            except Exception as error:
-
-                return jsonify({
-                    "error":
-                        "Unable to load stored key: "
-                        f"{str(error)}"
-                }), 500
-
-
-            # ------------------------------------------------
-            # Symmetric stored key
-            # ------------------------------------------------
-
             if encryption_algorithm in {
                 AES_ALGORITHM,
                 CHACHA_ALGORITHM
             }:
-
                 symmetric_key = stored_key
-
-
-            # ------------------------------------------------
-            # Hybrid stored private key
-            # ------------------------------------------------
-
-            elif encryption_algorithm == HYBRID_ALGORITHM:
-
+            else:
                 private_key = stored_key
 
-
-        # ====================================================
-        # UPLOADED KEY MODE
-        # ====================================================
+        # ----------------------------------------------------
+        # 8. UPLOADED KEY MODE
+        # ----------------------------------------------------
 
         else:
-
-            uploaded_raw_key = (
-                key_file.read().strip()
-            )
-
+            uploaded_raw_key = key_file.read().strip()
 
             if not uploaded_raw_key:
-
                 return jsonify({
-                    "error":
-                        "Please provide the required "
-                        "decryption key."
+                    "success": False,
+                    "error": "The uploaded key file is empty."
                 }), 400
-
-
-            # ------------------------------------------------
-            # If encryption metadata exists, use the exact
-            # algorithm recorded during encryption.
-            #
-            # Otherwise preserve compatibility with the
-            # previous implementation by detecting the key.
-            # ------------------------------------------------
 
             if encryption_algorithm in {
                 AES_ALGORITHM,
                 CHACHA_ALGORITHM
             }:
-
                 try:
-
-                    symmetric_key = (
-                        base64.b64decode(
-                            uploaded_raw_key,
-                            validate=True
-                        )
+                    symmetric_key = base64.b64decode(
+                        uploaded_raw_key,
+                        validate=True
                     )
-
                 except Exception:
+                    symmetric_key = uploaded_raw_key
 
-                    symmetric_key = (
-                        uploaded_raw_key
-                    )
-
-
-                if not symmetric_key:
-
+                if len(symmetric_key) != 32:
                     return jsonify({
-                        "error":
-                            "Invalid encryption key."
+                        "success": False,
+                        "error": (
+                            "Invalid symmetric key. "
+                            "A 256-bit key must contain 32 decoded bytes."
+                        )
                     }), 400
 
-
-                key_type = (
-                    "256-bit symmetric key"
-                )
-
+                key_type = "256-bit symmetric key"
 
             elif encryption_algorithm == HYBRID_ALGORITHM:
-
                 try:
+                    private_key = serialization.load_pem_private_key(
+                        uploaded_raw_key,
+                        password=None
+                    )
+                except (ValueError, TypeError):
+                    return jsonify({
+                        "success": False,
+                        "error": "Invalid RSA private key."
+                    }), 400
 
-                    private_key = (
-                        serialization
-                        .load_pem_private_key(
+                key_type = "RSA-2048 private key"
+
+            else:
+                # Legacy compatibility: if no encryption record
+                # exists for this user, identify the uploaded key
+                # by its format. Do not use another user's metadata.
+                try:
+                    possible_symmetric_key = base64.b64decode(
+                        uploaded_raw_key,
+                        validate=True
+                    )
+                except Exception:
+                    possible_symmetric_key = uploaded_raw_key
+
+                if len(possible_symmetric_key) == 32:
+                    symmetric_key = possible_symmetric_key
+                    key_type = "256-bit symmetric key"
+                else:
+                    try:
+                        private_key = serialization.load_pem_private_key(
                             uploaded_raw_key,
                             password=None
                         )
-                    )
-
-                except Exception:
-
-                    return jsonify({
-                        "error":
-                            "Invalid RSA private key."
-                    }), 400
-
-
-                key_type = (
-                    "RSA-2048 private key"
-                )
-
-
-            else:
-
-                # ------------------------------------------------
-                # No metadata available.
-                #
-                # First try a Base64/raw 32-byte symmetric key.
-                # If that does not work, try RSA private key.
-                # ------------------------------------------------
-
-                try:
-
-                    symmetric_key = (
-                        base64.b64decode(
-                            uploaded_raw_key,
-                            validate=True
-                        )
-                    )
-
-                except Exception:
-
-                    symmetric_key = (
-                        uploaded_raw_key
-                    )
-
-
-                if (
-                    not symmetric_key
-                    or
-                    not isinstance(
-                        symmetric_key,
-                        bytes
-                    )
-                    or
-                    len(symmetric_key) != 32
-                ):
-
-                    symmetric_key = None
-
-
-                if symmetric_key:
-
-                    key_type = (
-                        "256-bit symmetric key"
-                    )
-
-                else:
-
-                    try:
-
-                        private_key = (
-                            serialization
-                            .load_pem_private_key(
-                                uploaded_raw_key,
-                                password=None
-                            )
-                        )
-
-                    except Exception:
-
+                    except (ValueError, TypeError):
                         return jsonify({
-                            "error":
-                                "Invalid encryption key."
+                            "success": False,
+                            "error": (
+                                "Invalid key format, or no supported "
+                                "encryption metadata was found."
+                            )
                         }), 400
 
-                    key_type = (
-                        "RSA-2048 private key"
-                    )
+                    key_type = "RSA-2048 private key"
 
+        # ----------------------------------------------------
+        # 9. SELECT THE DECRYPTION ALGORITHM
+        # ----------------------------------------------------
 
-        # ====================================================
-        # 1. AES-256-GCM
-        # ====================================================
+        if encryption_algorithm == AES_ALGORITHM:
+            if symmetric_key is None:
+                return jsonify({
+                    "success": False,
+                    "error": "An AES symmetric key is required."
+                }), 400
 
-        if (
-            encryption_algorithm == AES_ALGORITHM
-            and
-            symmetric_key is not None
-        ):
+            aes_decrypt_file(
+                temp_enc_path,
+                decrypted_out_path,
+                symmetric_key
+            )
 
+            actual_algorithm = AES_ALGORITHM
+
+        elif encryption_algorithm == CHACHA_ALGORITHM:
+            if symmetric_key is None:
+                return jsonify({
+                    "success": False,
+                    "error": "A ChaCha20 symmetric key is required."
+                }), 400
+
+            chacha_decrypt_file(
+                temp_enc_path,
+                decrypted_out_path,
+                symmetric_key
+            )
+
+            actual_algorithm = CHACHA_ALGORITHM
+
+        elif encryption_algorithm == HYBRID_ALGORITHM:
+            if private_key is None:
+                return jsonify({
+                    "success": False,
+                    "error": "An RSA private key is required."
+                }), 400
+
+            hybrid_decrypt_file(
+                temp_enc_path,
+                decrypted_out_path,
+                private_key
+            )
+
+            actual_algorithm = HYBRID_ALGORITHM
+
+        elif symmetric_key is not None:
+            # Legacy files without metadata: try the two symmetric
+            # algorithms, then return an error if neither works.
             try:
-
                 aes_decrypt_file(
                     temp_enc_path,
                     decrypted_out_path,
                     symmetric_key
                 )
+                actual_algorithm = AES_ALGORITHM
 
             except Exception:
-
-                return jsonify({
-                    "error":
-                        "Invalid encryption key or "
-                        "corrupted encrypted file."
-                }), 400
-
-
-            decryption_time_ms = (
-                time.perf_counter()
-                -
-                decryption_start
-            ) * 1000
-
-
-            save_decryption_record(
-                user_id=DEMO_USER_ID,
-                filename=original_filename,
-                algorithm=AES_ALGORITHM,
-                key_type=key_type,
-                processing_time_ms=round(
-                    decryption_time_ms,
-                    2
-                ),
-                status="Success"
-            )
-
-
-            response = create_decryption_response(
-                decrypted_out_path,
-                original_filename,
-                AES_ALGORITHM
-            )
-
-            # Encrypted temporary file is no longer needed.
-            cleanup_file(temp_enc_path)
-
-            # The decrypted file is cleaned after the response
-            # is closed.
-            response.call_on_close(
-                lambda: cleanup_file(
-                    decrypted_out_path
-                )
-            )
-
-            return response
-
-
-        # ====================================================
-        # 2. CHACHA20-POLY1305
-        # ====================================================
-
-        if (
-            encryption_algorithm == CHACHA_ALGORITHM
-            and
-            symmetric_key is not None
-        ):
-
-            try:
+                cleanup_file(decrypted_out_path)
 
                 chacha_decrypt_file(
                     temp_enc_path,
                     decrypted_out_path,
                     symmetric_key
                 )
+                actual_algorithm = CHACHA_ALGORITHM
 
-            except Exception:
-
-                return jsonify({
-                    "error":
-                        "Invalid encryption key or "
-                        "corrupted encrypted file."
-                }), 400
-
-
-            decryption_time_ms = (
-                time.perf_counter()
-                -
-                decryption_start
-            ) * 1000
-
-
-            save_decryption_record(
-                user_id=DEMO_USER_ID,
-                filename=original_filename,
-                algorithm=CHACHA_ALGORITHM,
-                key_type=key_type,
-                processing_time_ms=round(
-                    decryption_time_ms,
-                    2
-                ),
-                status="Success"
-            )
-
-
-            response = create_decryption_response(
+        elif private_key is not None:
+            hybrid_decrypt_file(
+                temp_enc_path,
                 decrypted_out_path,
-                original_filename,
-                CHACHA_ALGORITHM
+                private_key
             )
 
-            cleanup_file(temp_enc_path)
+            actual_algorithm = HYBRID_ALGORITHM
 
-            response.call_on_close(
-                lambda: cleanup_file(
-                    decrypted_out_path
+        else:
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Decryption could not proceed. "
+                    "Check the encryption record and key."
                 )
-            )
-
-            return response
-
-
-        # ====================================================
-        # 3. HYBRID AES-256-GCM + RSA-OAEP
-        # ====================================================
-
-        if (
-            encryption_algorithm == HYBRID_ALGORITHM
-            and
-            private_key is not None
-        ):
-
-            try:
-
-                hybrid_decrypt_file(
-                    temp_enc_path,
-                    decrypted_out_path,
-                    private_key
-                )
-
-            except Exception:
-
-                return jsonify({
-                    "error":
-                        "Invalid RSA private key or "
-                        "corrupted encrypted file."
-                }), 400
-
-
-            decryption_time_ms = (
-                time.perf_counter()
-                -
-                decryption_start
-            ) * 1000
-
-
-            save_decryption_record(
-                user_id=DEMO_USER_ID,
-                filename=original_filename,
-                algorithm=HYBRID_ALGORITHM,
-                key_type=key_type,
-                processing_time_ms=round(
-                    decryption_time_ms,
-                    2
-                ),
-                status="Success"
-            )
-
-
-            response = create_decryption_response(
-                decrypted_out_path,
-                original_filename,
-                HYBRID_ALGORITHM
-            )
-
-            cleanup_file(temp_enc_path)
-
-            response.call_on_close(
-                lambda: cleanup_file(
-                    decrypted_out_path
-                )
-            )
-
-            return response
-
-
-        # ====================================================
-        # LEGACY FALLBACK
-        # ====================================================
-        #
-        # This is used only when there is no encryption
-        # metadata for the selected file.
-        #
-        # It keeps compatibility with encrypted files that
-        # may have existed before the encryption history
-        # lookup was introduced.
-        # ====================================================
-
-        if (
-            not encryption_algorithm
-            and
-            symmetric_key is not None
-        ):
-
-            # ------------------------------------------------
-            # Try AES
-            # ------------------------------------------------
-
-            try:
-
-                aes_decrypt_file(
-                    temp_enc_path,
-                    decrypted_out_path,
-                    symmetric_key
-                )
-
-                actual_algorithm = AES_ALGORITHM
-
-            except Exception:
-
-                # ------------------------------------------------
-                # Try ChaCha20
-                # ------------------------------------------------
-
-                try:
-
-                    chacha_decrypt_file(
-                        temp_enc_path,
-                        decrypted_out_path,
-                        symmetric_key
-                    )
-
-                    actual_algorithm = (
-                        CHACHA_ALGORITHM
-                    )
-
-                except Exception:
-
-                    actual_algorithm = None
-
-
-            if actual_algorithm:
-
-                decryption_time_ms = (
-                    time.perf_counter()
-                    -
-                    decryption_start
-                ) * 1000
-
-
-                save_decryption_record(
-                    user_id=DEMO_USER_ID,
-                    filename=original_filename,
-                    algorithm=actual_algorithm,
-                    key_type=(
-                        key_type
-                        or
-                        "256-bit symmetric key"
-                    ),
-                    processing_time_ms=round(
-                        decryption_time_ms,
-                        2
-                    ),
-                    status="Success"
-                )
-
-
-                response = create_decryption_response(
-                    decrypted_out_path,
-                    original_filename,
-                    actual_algorithm
-                )
-
-                cleanup_file(
-                    temp_enc_path
-                )
-
-                response.call_on_close(
-                    lambda: cleanup_file(
-                        decrypted_out_path
-                    )
-                )
-
-                return response
-
-
-        # ====================================================
-        # LEGACY HYBRID FALLBACK
-        # ====================================================
-
-        if (
-            not encryption_algorithm
-            and
-            private_key is not None
-        ):
-
-            try:
-
-                hybrid_decrypt_file(
-                    temp_enc_path,
-                    decrypted_out_path,
-                    private_key
-                )
-
-            except Exception:
-
-                return jsonify({
-                    "error":
-                        "Invalid encryption key or "
-                        "corrupted encrypted file."
-                }), 400
-
-
-            decryption_time_ms = (
-                time.perf_counter()
-                -
-                decryption_start
-            ) * 1000
-
-
-            save_decryption_record(
-                user_id=DEMO_USER_ID,
-                filename=original_filename,
-                algorithm=HYBRID_ALGORITHM,
-                key_type=(
-                    key_type
-                    or
-                    "RSA-2048 private key"
-                ),
-                processing_time_ms=round(
-                    decryption_time_ms,
-                    2
-                ),
-                status="Success"
-            )
-
-
-            response = create_decryption_response(
-                decrypted_out_path,
-                original_filename,
-                HYBRID_ALGORITHM
-            )
-
-            cleanup_file(
-                temp_enc_path
-            )
-
-            response.call_on_close(
-                lambda: cleanup_file(
-                    decrypted_out_path
-                )
-            )
-
-            return response
-
-
-        # ====================================================
-        # NO METHOD SUCCEEDED
-        # ====================================================
-
-        return jsonify({
-            "error":
-                "Decryption failed. The encryption "
-                "metadata or key is invalid."
-        }), 400
-
-
-    except Exception as error:
-
-        traceback.print_exc()
-
-        return jsonify({
-            "error":
-                f"Decryption failed: {str(error)}"
-        }), 400
-
-
-    finally:
-
-        # ====================================================
-        # CLEANUP ENCRYPTED TEMP FILE
-        # ====================================================
-        #
-        # On successful decryption this was already removed.
-        # This handles errors and early failures.
-        # ====================================================
-
-        cleanup_file(
-            temp_enc_path
+            }), 400
+
+        # ----------------------------------------------------
+        # 10. CONFIRM A DECRYPTED FILE WAS CREATED
+        # ----------------------------------------------------
+
+        if not os.path.isfile(decrypted_out_path):
+            return jsonify({
+                "success": False,
+                "error": "Decryption did not produce an output file."
+            }), 500
+
+        # ----------------------------------------------------
+        # 11. SAVE SUCCESS HISTORY FOR THIS USER
+        # ----------------------------------------------------
+
+        decryption_time_ms = (
+            time.perf_counter() - decryption_start
+        ) * 1000
+
+        save_decryption_record(
+            user_id=user_id,
+            filename=original_filename,
+            algorithm=actual_algorithm,
+            key_type=key_type or "Uploaded key",
+            processing_time_ms=round(
+                decryption_time_ms,
+                2
+            ),
+            status="Success"
         )
 
-        # Do NOT remove decrypted_out_path here on success.
-        #
-        # It is attached to response.call_on_close() so the
-        # browser has time to receive the file first.
+        # ----------------------------------------------------
+        # 12. RETURN THE DECRYPTED FILE
+        # ----------------------------------------------------
+
+        response = create_decryption_response(
+            decrypted_out_path,
+            original_filename,
+            actual_algorithm
+        )
+
+        # Keep the directory until Flask finishes sending
+        # the file, then remove it.
+        keep_temp_dir = True
+
+        response.call_on_close(
+            lambda: cleanup_directory(temp_dir)
+        )
+
+        return response
+
+    except Exception:
+        # Do not return internal filesystem paths, key details,
+        # or cryptography exceptions to the client.
+        current_app.logger.exception(
+            "File decryption failed for an authenticated user."
+        )
+
+        return jsonify({
+            "success": False,
+            "error": (
+                "Decryption failed. The key may be incorrect, "
+                "the file may be corrupted, or its metadata may "
+                "not match the encryption algorithm."
+            )
+        }), 400
+
+    finally:
+        # On failure, remove all temporary files immediately.
+        # On success, response.call_on_close handles cleanup.
+        if not keep_temp_dir:
+            cleanup_directory(temp_dir)

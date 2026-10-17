@@ -405,7 +405,9 @@ function HistoryPage({ onNavigate }) {
       try {
         const response = await fetch(
           `${API_URL}/history?${buildParams(true)}`,
-          { signal: controller.signal }
+          { signal: controller.signal,
+            credentials: 'include',
+           }
         )
 
         const json = await response.json()

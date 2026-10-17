@@ -1,8 +1,11 @@
 import os
 import base64
 
+BACKEND_DIR = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
 
-KEY_FOLDER = "keys"
+KEY_FOLDER = os.path.join(BACKEND_DIR, "keys")
 
 
 def generate_and_save_key(filename):

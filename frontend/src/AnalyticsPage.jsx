@@ -941,9 +941,12 @@ function AnalyticsPage({ onNavigate }) {
 
       try {
         const response = await fetch(
-          `${API_URL}/analytics?range=${range}&tz_offset=${offset}`,
-          { signal: controller.signal }
-        )
+           `${API_URL}/analytics?range=${range}&tz_offset=${offset}`,
+            {
+              signal: controller.signal,
+              credentials: 'include',
+            }
+  )
 
         const json = await response.json()
 

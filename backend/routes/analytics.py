@@ -1,7 +1,7 @@
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
-
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
+from auth_utils import login_required
 
 from database.mongodb import (
     encryption_history_collection,
@@ -21,7 +21,6 @@ analytics_bp = Blueprint(
 # TEMPORARY USER ID
 # ============================================================
 
-DEMO_USER_ID = "demo-user"
 
 RANGE_DAYS = {
     "7d": 7,
@@ -111,6 +110,7 @@ def get_tz_offset():
     "/analytics",
     methods=["GET"]
 )
+@login_required
 def get_analytics():
     """
     Aggregated statistics for the Analytics page.
@@ -130,7 +130,8 @@ def get_analytics():
         if selected_range not in RANGE_DAYS:
             selected_range = "all"
 
-        query = {"user_id": DEMO_USER_ID}
+        user_id = str(session["user_id"])
+        query = {"user_id": user_id}
 
         since = None
 

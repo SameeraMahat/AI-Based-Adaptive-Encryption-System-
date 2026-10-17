@@ -6,6 +6,7 @@ const API_URL = 'http://127.0.0.1:5000/api'
 function DecryptPage({ onNavigate }) {
   const [encryptedFile, setEncryptedFile] = useState(null)
   const [keyFile, setKeyFile] = useState(null)
+  const [currentPassword, setCurrentPassword] = useState('')
 
   const [keySource, setKeySource] = useState('stored')
 
@@ -134,7 +135,10 @@ function DecryptPage({ onNavigate }) {
   const loadRecentActivity = async () => {
     try {
       const response = await fetch(
-        `${API_URL}/decrypt/history`
+        `${API_URL}/decrypt/history`,
+        {
+          credentials: 'include',
+        }
       )
 
       const data = await response.json()
@@ -181,7 +185,10 @@ function DecryptPage({ onNavigate }) {
       const response = await fetch(
         `${API_URL}/dashboard/encryption/${encodeURIComponent(
           file.name.slice(0, -4)
-        )}`
+        )}`,
+        {
+          credentials: 'include',
+        }
       )
 
       const data = await response.json()
@@ -404,6 +411,19 @@ function DecryptPage({ onNavigate }) {
 
 
     // ----------------------------------------------------------
+    // Password confirmation validation
+    // ----------------------------------------------------------
+
+    if (!currentPassword) {
+      setError(
+        'Please enter your account password to confirm decryption.'
+      )
+
+      return
+    }
+
+
+    // ----------------------------------------------------------
     // Uploaded key validation
     // ----------------------------------------------------------
 
@@ -431,6 +451,16 @@ function DecryptPage({ onNavigate }) {
     formData.append(
       'file',
       encryptedFile
+    )
+
+
+    // ----------------------------------------------------------
+    // Account password (verified by the backend)
+    // ----------------------------------------------------------
+
+    formData.append(
+      'password',
+      currentPassword
     )
 
 
@@ -465,6 +495,7 @@ function DecryptPage({ onNavigate }) {
         `${API_URL}/decrypt`,
         {
           method: 'POST',
+          credentials: 'include',
           body: formData,
         }
       )
@@ -623,6 +654,7 @@ function DecryptPage({ onNavigate }) {
     } finally {
 
       setDecrypting(false)
+      setCurrentPassword('')
     }
   }
 
@@ -633,6 +665,7 @@ function DecryptPage({ onNavigate }) {
 
   const canDecrypt =
     Boolean(encryptedFile) &&
+    Boolean(currentPassword) &&
     (
       keySource === 'stored' ||
       Boolean(keyFile)
@@ -1121,6 +1154,60 @@ function DecryptPage({ onNavigate }) {
 
               </div>
             )}
+
+          </section>
+
+
+          {/* ==================================================
+              ACCOUNT PASSWORD CONFIRMATION
+              ================================================== */}
+
+          <section className="decrypt-card">
+
+            <div className="decrypt-card-heading">
+
+              <div className="section-icon">
+                🔒
+              </div>
+
+              <div>
+                <h2>
+                  Confirm Your Identity
+                </h2>
+
+                <p>
+                  Enter your account password to authorize decryption.
+                </p>
+              </div>
+
+            </div>
+
+            <div className="password-confirmation">
+
+              <label htmlFor="decryption-password">
+                Account Password
+              </label>
+
+              <input
+                id="decryption-password"
+                type="password"
+                value={currentPassword}
+                onChange={(event) => {
+                  setCurrentPassword(event.target.value)
+                  setError('')
+                  setSuccess(null)
+                }}
+                placeholder="Enter your login password"
+                autoComplete="current-password"
+                disabled={decrypting}
+                required
+              />
+
+              <p>
+                Your password is verified by the backend and is not stored in your decryption history.
+              </p>
+
+            </div>
 
           </section>
 

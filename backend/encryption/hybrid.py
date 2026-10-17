@@ -5,8 +5,15 @@ from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 
-HYBRID_KEY_FOLDER = "keys/hybrid"
+BACKEND_DIR = os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__))
+)
 
+HYBRID_KEY_FOLDER = os.path.join(
+    BACKEND_DIR,
+    "keys",
+    "hybrid"
+)
 
 def generate_rsa_key_pair():
     """

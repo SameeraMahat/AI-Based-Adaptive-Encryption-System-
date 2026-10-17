@@ -44,3 +44,9 @@ AdaptiveEncryptionAI_backup/
 
 # Temporary decrypted files
 backend/temp_decrypted/
+
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example

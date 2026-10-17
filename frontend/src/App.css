@@ -2095,3 +2095,31 @@
   }
 
 }
+
+
+.auth-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #090d17;
+  color: #edf2ff;
+  font-family: inherit;
+}
+
+.current-user-name {
+  color: #d9e1f3;
+  font-size: 13px;
+}
+
+.logout-button {
+  padding: 9px 13px;
+  border: 1px solid #35415a;
+  border-radius: 8px;
+  background: transparent;
+  color: #e1e7f5;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background: #1a2438;
+}

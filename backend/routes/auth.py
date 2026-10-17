@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from database.mongodb import users_collection
@@ -8,6 +8,10 @@ from database.mongodb import users_collection
 
 auth_bp = Blueprint("auth", __name__)
 
+
+# ============================================================
+# REGISTER
+# ============================================================
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
@@ -58,7 +62,7 @@ def register():
 
         return jsonify({
             "success": True,
-            "message": "Registration successful.",
+            "message": "Registration successful. Please log in.",
             "user": {
                 "id": str(result.inserted_id),
                 "username": username,
@@ -75,6 +79,10 @@ def register():
             "message": "Registration failed."
         }), 500
 
+
+# ============================================================
+# LOGIN
+# ============================================================
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
@@ -94,13 +102,7 @@ def login():
             "email": email
         })
 
-        if not user:
-            return jsonify({
-                "success": False,
-                "message": "Invalid email or password."
-            }), 401
-
-        if not check_password_hash(
+        if not user or not check_password_hash(
             user.get("password_hash", ""),
             password
         ):
@@ -108,6 +110,15 @@ def login():
                 "success": False,
                 "message": "Invalid email or password."
             }), 401
+
+        # Clear any previous session before establishing a new one.
+        session.clear()
+        session.permanent = True
+
+        session["user_id"] = str(user["_id"])
+        session["email"] = user.get("email", "")
+        session["username"] = user.get("username", "")
+        session["role"] = user.get("role", "user")
 
         return jsonify({
             "success": True,
@@ -127,3 +138,42 @@ def login():
             "success": False,
             "message": "Login failed."
         }), 500
+
+
+# ============================================================
+# CHECK CURRENT LOGIN SESSION
+# ============================================================
+
+@auth_bp.route("/me", methods=["GET"])
+def current_user():
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({
+            "authenticated": False,
+            "message": "Please log in to continue."
+        }), 401
+
+    return jsonify({
+        "authenticated": True,
+        "user": {
+            "id": user_id,
+            "username": session.get("username", ""),
+            "email": session.get("email", ""),
+            "role": session.get("role", "user")
+        }
+    }), 200
+
+
+# ============================================================
+# LOGOUT
+# ============================================================
+
+@auth_bp.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+
+    return jsonify({
+        "success": True,
+        "message": "Logged out successfully."
+    }), 200

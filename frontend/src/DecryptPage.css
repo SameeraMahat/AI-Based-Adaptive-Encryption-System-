@@ -636,6 +636,61 @@
 
 
 /* ============================================================
+   ACCOUNT PASSWORD CONFIRMATION
+   ============================================================ */
+
+.password-confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.password-confirmation label {
+  color: #dcdcdc;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.password-confirmation input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 14px;
+
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+
+  background: rgba(0, 0, 0, 0.18);
+  color: #f2f2f2;
+
+  font-family: inherit;
+  font-size: 13px;
+
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.password-confirmation input::placeholder {
+  color: #707070;
+}
+
+.password-confirmation input:focus {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.password-confirmation input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.password-confirmation p {
+  margin: 0;
+  color: #777;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+
+/* ============================================================
    DECRYPT BUTTON
    ============================================================ */
 

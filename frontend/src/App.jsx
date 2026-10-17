@@ -1,5 +1,6 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import './App.css'
+import AuthPage from './AuthPage'
 import DecryptPage from './DecryptPage'
 import HistoryPage from './HistoryPage'
 import AnalyticsPage from './AnalyticsPage'
@@ -12,6 +13,57 @@ function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const [currentUser, setCurrentUser] = useState(null)
+  const [authChecking, setAuthChecking] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const checkSession = async () => {
+      try {
+        const response = await fetch(`${API_URL}/auth/me`, {
+          method: 'GET',
+          credentials: 'include',
+        })
+
+        const data = await response.json()
+
+        if (!cancelled && response.ok && data.authenticated) {
+          setCurrentUser(data.user)
+        }
+      } catch (error) {
+        console.error('Unable to check login session:', error)
+      } finally {
+        if (!cancelled) {
+          setAuthChecking(false)
+        }
+      }
+    }
+
+    checkSession()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+    } catch (error) {
+      console.error('Logout request failed:', error)
+    } finally {
+      setCurrentUser(null)
+      setActivePage('home')
+      setFile(null)
+      setResult(null)
+      setError('')
+    }
+  }
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0]
@@ -37,6 +89,7 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/upload`, {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       })
 
@@ -134,6 +187,22 @@ function App() {
       time: '2 hours ago',
     },
   ]
+
+  // =====================================================
+  // AUTHENTICATION GATE
+  // =====================================================
+
+  if (authChecking) {
+    return (
+      <div className="auth-loading">
+        Checking your secure session...
+      </div>
+    )
+  }
+
+  if (!currentUser) {
+    return <AuthPage onAuthenticated={setCurrentUser} />
+  }
 
   return (
     <div className="app">
@@ -249,8 +318,11 @@ function App() {
             <span className="search-icon">⌕</span>
 
             <input
-              type="text"
-              placeholder="Search files, history, or settings..."
+             id="global-search"
+             name="globalSearch"
+             type="text"
+             placeholder="Search files, history, or settings..."
+             aria-label="Search files, history, or settings"
             />
 
             <kbd>Ctrl K</kbd>
@@ -268,9 +340,21 @@ function App() {
               Backend Connected
             </div>
 
-            <div className="profile">
-              U
+            <div className="profile" title={currentUser.email}>
+              {currentUser.username?.charAt(0)?.toUpperCase() || 'U'}
             </div>
+
+            <span className="current-user-name">
+              {currentUser.username}
+            </span>
+
+            <button
+              type="button"
+              className="logout-button"
+              onClick={handleLogout}
+            >
+              Sign out
+            </button>
 
           </div>
 

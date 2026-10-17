@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, session
 
 from database.mongodb import encryption_history_collection
 
@@ -9,15 +9,6 @@ dashboard_bp = Blueprint(
     "dashboard",
     __name__
 )
-
-
-# ============================================================
-# TEMPORARY USER ID
-# ============================================================
-# Login/signup is not being implemented yet.
-# This will later be replaced by the real logged-in user ID.
-
-DEMO_USER_ID = "demo-user"
 
 
 # ============================================================
@@ -41,15 +32,12 @@ def save_encryption_record(
     status
 ):
     """
-    Save the result of a successful encryption operation
-    into MongoDB.
-
-    Collection:
-        encryption_history
+    Save encryption metadata for the specified user.
+    The caller must supply the authenticated user's ID.
     """
 
     encryption_record = {
-        "user_id": user_id,
+        "user_id": str(user_id),
         "filename": filename,
         "file_type": file_type,
         "file_size_mb": file_size_mb,
@@ -83,15 +71,16 @@ def save_encryption_record(
 )
 def get_encryption_metadata(filename):
     """
-    Return actual encryption metadata for an encrypted file.
-
-    The encrypted file name is expected to be:
-
-        original_filename.enc
-
-    MongoDB stores the original filename, so the .enc suffix
-    is removed before searching.
+    Return encryption metadata belonging to the logged-in user.
     """
+
+    user_id = session.get("user_id")
+
+    if not user_id:
+        return jsonify({
+            "success": False,
+            "error": "Please log in to continue."
+        }), 401
 
     original_filename = filename
 
@@ -100,7 +89,7 @@ def get_encryption_metadata(filename):
 
     record = encryption_history_collection.find_one(
         {
-            "user_id": DEMO_USER_ID,
+            "user_id": user_id,
             "filename": original_filename
         },
         {
@@ -114,10 +103,7 @@ def get_encryption_metadata(filename):
             "error": "Encryption metadata not found."
         }), 404
 
-    if isinstance(
-        record.get("created_at"),
-        datetime
-    ):
+    if isinstance(record.get("created_at"), datetime):
         record["created_at"] = record[
             "created_at"
         ].isoformat()
