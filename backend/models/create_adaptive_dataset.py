@@ -47,7 +47,7 @@ def select_algorithm(sensitivity_score, file_size_mb):
     elif sensitivity_score <= 50:
         return "AES"
 
-    elif file_size_mb >= 5:
+    elif file_size_mb > 10:
         return "Hybrid"
 
     else:

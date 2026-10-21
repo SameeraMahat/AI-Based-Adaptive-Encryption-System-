@@ -147,6 +147,8 @@ print(
 
 
 # ============================================================
+
+# ============================================================
 # DISPLAY ADAPTIVE RULE
 # ============================================================
 
@@ -155,22 +157,10 @@ print("-" * 60)
 print("ADAPTIVE ENCRYPTION RULE")
 print("-" * 60)
 
-print(
-    "Sensitivity <= 20              -> ChaCha20"
-)
-
-print(
-    "Sensitivity 21-50              -> AES"
-)
-
-print(
-    "Sensitivity > 50 + Size >= 5MB -> Hybrid"
-)
-
-print(
-    "Sensitivity > 50 + Size < 5MB  -> AES"
-)
-
+print("Sensitivity <= 20              -> ChaCha20")
+print("Sensitivity > 20 and <= 50     -> AES")
+print("Sensitivity > 50 + Size <= 10MB -> AES")
+print("Sensitivity > 50 + Size > 10MB  -> Hybrid")
 
 # ============================================================
 # FEATURES AND TARGET

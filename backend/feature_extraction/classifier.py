@@ -1,3 +1,4 @@
+
 import re
 
 CATEGORY_KEYWORDS = {
@@ -5,32 +6,26 @@ CATEGORY_KEYWORDS = {
         "invoice", "payment", "bank", "tax", "salary",
         "budget", "gst", "balance", "account", "finance"
     ],
-
     "HR": [
         "employee", "resume", "recruitment", "leave",
         "attendance", "joining", "designation", "hr"
     ],
-
     "Legal": [
         "agreement", "contract", "law", "court",
         "clause", "legal", "plaintiff", "defendant"
     ],
-
     "Medical": [
         "patient", "diagnosis", "hospital", "medicine",
         "doctor", "treatment", "prescription"
     ],
-
     "Research": [
         "research", "experiment", "dataset", "analysis",
         "methodology", "results", "paper", "journal"
     ],
-
     "Business": [
         "client", "project", "meeting", "proposal",
         "strategy", "company", "business", "roadmap"
     ],
-
     "Personal": [
         "diary", "personal", "family", "friend",
         "vacation", "birthday"
@@ -40,23 +35,33 @@ CATEGORY_KEYWORDS = {
 
 def classify_document(text):
     """
-    Classifies the document into a category based on keyword matching.
+    Classify a document using whole-word keyword matching.
+
     Returns:
-    {
-        "document_category": "...",
-        "category_confidence": 0.xx
-    }
+        {
+            "document_category": str,
+            "category_confidence": float
+        }
+
+    Confidence is the winning category's share of all keyword
+    matches. It is a heuristic, not a calibrated probability.
     """
 
-    text = text.lower()
+    if not isinstance(text, str) or not text.strip():
+        return {
+            "document_category": "General",
+            "category_confidence": 0.0
+        }
 
+    text = text.casefold()
     scores = {}
 
     for category, keywords in CATEGORY_KEYWORDS.items():
         count = 0
 
         for keyword in keywords:
-            count += len(re.findall(r'\b' + re.escape(keyword) + r'\b', text))
+            pattern = r"\b" + re.escape(keyword.casefold()) + r"\b"
+            count += len(re.findall(pattern, text))
 
         scores[category] = count
 
@@ -65,12 +70,28 @@ def classify_document(text):
     if total_matches == 0:
         return {
             "document_category": "General",
-            "category_confidence": 0.50
+            "category_confidence": 0.0
         }
 
-    best_category = max(scores, key=scores.get)
+    # Stable tie-breaking: preserve CATEGORY_KEYWORDS order.
+    best_category = max(
+        CATEGORY_KEYWORDS,
+        key=lambda category: scores[category]
+    )
 
-    confidence = round(scores[best_category] / total_matches, 2)
+    # If multiple categories tie for the highest score,
+    # avoid presenting the result as a confident classification.
+    highest_score = scores[best_category]
+    tied_categories = [
+        category
+        for category, score in scores.items()
+        if score == highest_score
+    ]
+
+    if len(tied_categories) > 1:
+        confidence = round(highest_score / total_matches, 2)
+    else:
+        confidence = round(highest_score / total_matches, 2)
 
     return {
         "document_category": best_category,

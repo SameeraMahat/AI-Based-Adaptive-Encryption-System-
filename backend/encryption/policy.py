@@ -35,7 +35,7 @@ def select_encryption_policy(classification, sensitivity):
         }
 
     # HIGH SENSITIVITY + LARGE FILE
-    elif file_size_mb >= 5:
+    elif file_size_mb > 10:
         return {
             "algorithm": "Hybrid",
             "display_algorithm": "Hybrid AES-256-GCM + RSA-OAEP",

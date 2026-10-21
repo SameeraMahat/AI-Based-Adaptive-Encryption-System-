@@ -1,5 +1,11 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import './App.css'
+import Signup from "./assets/components/Signup.jsx";
+import Login from "./assets/components/Login.jsx";
+import DecryptPage from "./assets/components/DecryptPage";
+import AnalyticsPage from './assets/components/AnalyticsPage'
+import Settings from "./assets/components/Settings";
+import HistoryPage from './assets/components/HistoryPage'
 
 const API_URL = 'http://127.0.0.1:5000/api'
 
@@ -8,6 +14,304 @@ function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [activePage, setActivePage] = useState('home')
+  const [showDecryptVerification, setShowDecryptVerification] = useState(false)
+  const [decryptPassword, setDecryptPassword] = useState('')
+  const [decryptToken, setDecryptToken] = useState('')
+  const [decryptVerifyLoading, setDecryptVerifyLoading] = useState(false)
+  const [decryptVerifyError, setDecryptVerifyError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchInputRef = useRef(null)
+
+
+const openDecryptVerification = () => {
+  console.log('Opening decrypt verification modal')
+
+  setDecryptPassword('')
+  setDecryptVerifyError('')
+  setShowDecryptVerification(true)
+}
+
+
+  const searchItems = [
+  {
+    title: 'Home',
+    description: 'Go to dashboard and upload files',
+    keywords: 'home dashboard upload file encryption',
+    action: () => {
+      document
+        .querySelector('.hero')
+        ?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+    },
+  },
+  {
+    title: 'Encrypt',
+    description: 'Upload and encrypt a file',
+    keywords: 'encrypt encryption upload secure file',
+    action: () => {
+      document
+        .querySelector('.upload-section')
+        ?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+    },
+  },
+  {
+  title: 'Decrypt',
+  description: 'Decrypt a file after password verification',
+  keywords: 'decrypt decryption secure file',
+  action: openDecryptVerification,
+},
+  {
+    title: 'History',
+    description: 'View encryption and decryption history',
+    keywords: 'history activity records encryption decryption',
+    action: () => {
+      const button = [...document.querySelectorAll('.nav-item')]
+        .find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('history')
+        )
+
+      button?.click()
+    },
+  },
+  {
+    title: 'Analytics',
+    description: 'View security and encryption analytics',
+    keywords: 'analytics statistics charts security performance',
+    action: () => {
+      const button = [...document.querySelectorAll('.nav-item')]
+        .find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('analytics')
+        )
+
+      button?.click()
+    },
+  },
+  {
+    title: 'Settings',
+    description: 'Manage application settings',
+    keywords: 'settings preferences security theme account support',
+    action: () => {
+      const button = [...document.querySelectorAll('.nav-item')]
+        .find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('settings')
+        )
+
+      button?.click()
+    },
+  },
+  {
+    title: 'Documentation',
+    description: 'Learn how to use Adaptive Encryption',
+    keywords: 'documentation help guide user manual docs',
+    action: () => {
+      const button = [...document.querySelectorAll('.nav-item')]
+        .find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('settings')
+        )
+
+      button?.click()
+
+      setTimeout(() => {
+        const documentationButton = [
+          ...document.querySelectorAll('.support-row'),
+        ].find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('documentation')
+        )
+
+        documentationButton?.click()
+      }, 250)
+    },
+  },
+  {
+    title: 'Report an Issue',
+    description: 'Report a system problem or bug',
+    keywords: 'issue bug problem error report support',
+    action: () => {
+      const button = [...document.querySelectorAll('.nav-item')]
+        .find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('settings')
+        )
+
+      button?.click()
+
+      setTimeout(() => {
+        const issueButton = [
+          ...document.querySelectorAll('.support-row'),
+        ].find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('report an issue')
+        )
+
+        issueButton?.click()
+      }, 250)
+    },
+  },
+  {
+    title: 'Contact Support',
+    description: 'Contact the support team',
+    keywords: 'contact support help message assistance',
+    action: () => {
+      const button = [...document.querySelectorAll('.nav-item')]
+        .find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('settings')
+        )
+
+      button?.click()
+
+      setTimeout(() => {
+        const supportButton = [
+          ...document.querySelectorAll('.support-row'),
+        ].find((item) =>
+          item.textContent
+            ?.toLowerCase()
+            .includes('contact support')
+        )
+
+        supportButton?.click()
+      }, 250)
+    },
+  },
+]
+
+
+const filteredSearchItems = searchItems.filter((item) => {
+  const query = searchQuery.trim().toLowerCase()
+
+  if (!query) {
+    return false
+  }
+
+  const title = String(item.title || '').toLowerCase()
+  const description = String(item.description || '').toLowerCase()
+  const keywords = String(item.keywords || '').toLowerCase()
+
+  return (
+    title.includes(query) ||
+    description.includes(query) ||
+    keywords.includes(query)
+  )
+})
+
+
+const handleSearchSelect = (item) => {
+  setSearchQuery('')
+  item.action()
+}
+
+
+const handleDecryptVerification = async (event) => {
+  event.preventDefault()
+  setDecryptVerifyError('')
+
+  let user = null
+
+  try {
+    user = JSON.parse(localStorage.getItem('user') || 'null')
+  } catch {
+    user = null
+  }
+
+  if (!user?.email) {
+    setDecryptVerifyError(
+      'Logged-in user email not found. Please log in again.'
+    )
+    return
+  }
+
+  if (!decryptPassword) {
+    setDecryptVerifyError('Please enter your password.')
+    return
+  }
+
+  setDecryptVerifyLoading(true)
+
+  try {
+    const response = await fetch(
+      `${API_URL}/auth/verify-decrypt`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: user.email,
+          password: decryptPassword,
+        }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!response.ok || !data.decrypt_token) {
+      throw new Error(
+        data.message || 'Password verification failed.'
+      )
+    }
+
+    setDecryptToken(data.decrypt_token)
+    setShowDecryptVerification(false)
+    setDecryptPassword('')
+    setActivePage('decrypt')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  } catch (error) {
+    setDecryptVerifyError(
+      error.message || 'Unable to verify password.'
+    )
+  } finally {
+    setDecryptVerifyLoading(false)
+  }
+}
+
+
+useEffect(() => {
+  const handleKeyboardShortcut = (event) => {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === 'k'
+    ) {
+      event.preventDefault()
+      searchInputRef.current?.focus()
+    }
+
+    if (event.key === 'Escape') {
+      setSearchQuery('')
+      searchInputRef.current?.blur()
+    }
+  }
+
+  window.addEventListener(
+    'keydown',
+    handleKeyboardShortcut
+  )
+
+  return () => {
+    window.removeEventListener(
+      'keydown',
+      handleKeyboardShortcut
+    )
+  }
+}, [])
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0]
@@ -43,6 +347,10 @@ function App() {
       }
 
       setResult(data)
+
+addRecentActivity(
+  data.filename || file.name
+)
     } catch (err) {
       setError(
         err.message ||
@@ -96,40 +404,152 @@ function App() {
     return `${(value * 100).toFixed(1)}%`
   }
 
-  const getSensitivityLevel = (score) => {
-    if (score === undefined || score === null) {
-      return 'N/A'
-    }
-
-    if (score >= 75) return 'Very High'
-    if (score >= 50) return 'High'
-    if (score >= 25) return 'Medium'
-
-    return 'Low'
+  
+const getSensitivityLevel = (score) => {
+  if (
+    score === undefined ||
+    score === null ||
+    score === ''
+  ) {
+    return 'N/A';
   }
 
-  const recentFiles = [
-    {
-      name: 'research_paper.pdf',
-      type: 'PDF',
-      time: '2 min ago',
-    },
-    {
-      name: 'data_analysis.xlsx',
-      type: 'XLSX',
-      time: '15 min ago',
-    },
-    {
-      name: 'project_docs.zip',
-      type: 'ZIP',
-      time: '1 hour ago',
-    },
-    {
-      name: 'image_sample.png',
-      type: 'IMG',
-      time: '2 hours ago',
-    },
-  ]
+  const value = Number(score);
+
+  if (!Number.isFinite(value)) {
+    return 'N/A';
+  }
+
+  if (value <= 20) return 'Low';
+  if (value <= 50) return 'Medium';
+  if (value <= 75) return 'High';
+
+  return 'Very High';
+};
+
+  const getStoredRecentFiles = () => {
+  try {
+    const stored = localStorage.getItem(
+      'adaptiveEncryptionRecentFiles'
+    )
+
+    if (!stored) {
+      return []
+    }
+
+    const parsed = JSON.parse(stored)
+
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+
+const [recentFiles, setRecentFiles] = useState(
+  getStoredRecentFiles
+)
+
+
+const getFileType = (filename) => {
+  const extension = filename
+    ?.split('.')
+    .pop()
+    ?.toLowerCase()
+
+  if (extension === 'pdf') return 'PDF'
+  if (extension === 'xlsx' || extension === 'xls') return 'XLSX'
+  if (extension === 'zip') return 'ZIP'
+  if (
+    extension === 'png' ||
+    extension === 'jpg' ||
+    extension === 'jpeg'
+  ) {
+    return 'IMG'
+  }
+  if (extension === 'docx') return 'DOCX'
+  if (extension === 'txt') return 'TXT'
+
+  return extension
+    ? extension.toUpperCase().slice(0, 4)
+    : 'FILE'
+}
+
+
+const formatActivityTime = (timestamp) => {
+  if (!timestamp) {
+    return 'Just now'
+  }
+
+  const difference =
+    Date.now() - new Date(timestamp).getTime()
+
+  const seconds = Math.max(
+    0,
+    Math.floor(difference / 1000)
+  )
+
+  if (seconds < 60) {
+    return 'Just now'
+  }
+
+  const minutes = Math.floor(seconds / 60)
+
+  if (minutes < 60) {
+    return `${minutes} min ago`
+  }
+
+  const hours = Math.floor(minutes / 60)
+
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  }
+
+  const days = Math.floor(hours / 24)
+
+  return `${days} day${days === 1 ? '' : 's'} ago`
+}
+
+
+const addRecentActivity = (filename) => {
+  if (!filename) {
+    return
+  }
+
+  const activity = {
+    id: `${Date.now()}-${filename}`,
+    name: filename,
+    type: getFileType(filename),
+    time: new Date().toISOString(),
+  }
+
+  setRecentFiles((previous) => {
+    const updated = [
+      activity,
+      ...previous.filter(
+        (item) => item.name !== filename
+      ),
+    ].slice(0, 10)
+
+    localStorage.setItem(
+      'adaptiveEncryptionRecentFiles',
+      JSON.stringify(updated)
+    )
+
+    return updated
+  })
+}
+  // Signup page condition
+
+const currentPath = window.location.pathname;
+
+if (currentPath === "/signup") {
+  return <Signup />;
+}
+
+if (currentPath === "/login") {
+  return <Login />;
+}
 
   return (
     <div className="app">
@@ -158,12 +578,11 @@ function App() {
         <nav className="navigation">
 
   <button
-    className="nav-item active"
-    onClick={() =>
-      document
-        .querySelector('.hero')
-        ?.scrollIntoView({ behavior: 'smooth' })
-    }
+    className={`nav-item ${activePage === 'home' ? 'active' : ''}`}
+    onClick={() => {
+      setActivePage('home')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }}
   >
     <span className="nav-icon">🏠</span>
     <span>Home</span>
@@ -171,32 +590,79 @@ function App() {
 
   
 
-  <button
-    className="nav-item"
-    onClick={() =>
-      document
-        .getElementById('decrypt-section')
-        ?.scrollIntoView({ behavior: 'smooth' })
+ 
+<button
+  type="button"
+  className={`nav-item ${activePage === 'decrypt' ? 'active' : ''}`}
+  onClick={() => {
+    
+
+    const savedUser = localStorage.getItem('user');
+
+    if (!savedUser) {
+ 
+  window.location.href = '/login';
+  return;
+}
+
+    let user;
+
+    try {
+      user = JSON.parse(savedUser);
+    } catch {
+      user = null;
     }
-  >
-    <span className="nav-icon">🔓</span>
-    <span>Decrypt</span>
-  </button>
 
-  <button className="nav-item">
-    <span className="nav-icon">🕘</span>
-    <span>History</span>
-  </button>
+    if (!user?.email) {
+      window.location.href = '/login';
+      return;
+    }
 
-  <button className="nav-item">
-    <span className="nav-icon">📊</span>
-    <span>Analytics</span>
-  </button>
 
-  <button className="nav-item">
-    <span className="nav-icon">⚙</span>
-    <span>Settings</span>
-  </button>
+openDecryptVerification();
+  }}
+>
+  <span className="nav-icon">🔓</span>
+  <span>Decrypt</span>
+</button>
+
+
+
+
+  
+<button
+  className={`nav-item ${activePage === 'history' ? 'active' : ''}`}
+  onClick={() => {
+    setActivePage('history')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }}
+>
+  <span className="nav-icon">🕘</span>
+  <span>History</span>
+</button>
+
+<button
+  className={`nav-item ${activePage === 'analytics' ? 'active' : ''}`}
+  onClick={() => {
+    setActivePage('analytics')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }}
+>
+  <span className="nav-icon">📊</span>
+  <span>Analytics</span>
+</button>
+
+
+  <button
+  className={`nav-item ${activePage === 'settings' ? 'active' : ''}`}
+  onClick={() => {
+    setActivePage('settings')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }}
+>
+  <span className="nav-icon">⚙</span>
+  <span>Settings</span>
+</button>
 
 </nav>
         <div className="sidebar-bottom">
@@ -234,44 +700,136 @@ function App() {
 
         {/* TOP BAR */}
 
-        <header className="topbar">
+        {activePage !== 'settings' && (
+  <header className="topbar">
 
-          <div className="search-box">
+    <div className="global-search">
 
-            <span className="search-icon">⌕</span>
+  <div className="search-box">
 
-            <input
-              type="text"
-              placeholder="Search files, history, or settings..."
-            />
+    <span className="search-icon">⌕</span>
 
-            <kbd>Ctrl K</kbd>
+    <input
+      ref={searchInputRef}
+      type="text"
+      value={searchQuery}
+      onChange={(event) =>
+        setSearchQuery(event.target.value)
+      }
+      onFocus={() => {
+        if (searchQuery.trim()) {
+          setSearchQuery(searchQuery)
+        }
+      }}
+      placeholder="Search files, history, or settings..."
+      aria-label="Search"
+    />
 
-          </div>
+    <kbd>Ctrl K</kbd>
 
-          <div className="topbar-actions">
+  </div>
 
-            <button className="notification">
-              !
-            </button>
 
-            <div className="backend-status">
-              <span className="online-dot" />
-              Backend Connected
-            </div>
+  {searchQuery.trim() && (
+    <div className="search-results">
 
-            <div className="profile">
-              U
-            </div>
+      {filteredSearchItems.length > 0 ? (
+        filteredSearchItems.map((item) => (
+          <button
+            type="button"
+            className="search-result-item"
+            key={item.title}
+            onClick={() =>
+              handleSearchSelect(item)
+            }
+          >
 
-          </div>
+            <span className="search-result-icon">
+              {item.title === 'Home' && '⌂'}
+              {item.title === 'Encrypt' && '🔒'}
+              {item.title === 'Decrypt' && '🔓'}
+              {item.title === 'History' && '◷'}
+              {item.title === 'Analytics' && '▥'}
+              {item.title === 'Settings' && '⚙'}
+              {item.title === 'Documentation' && '▣'}
+              {item.title === 'Report an Issue' && '⚠'}
+              {item.title === 'Contact Support' && '✉'}
+            </span>
 
-        </header>
 
+            <span className="search-result-content">
+
+              <strong>
+                {item.title}
+              </strong>
+
+              <small>
+                {item.description}
+              </small>
+
+            </span>
+
+
+            <span className="search-result-arrow">
+              →
+            </span>
+
+          </button>
+        ))
+      ) : (
+        <div className="search-no-results">
+          <strong>No results found</strong>
+          <span>
+            Try searching for Home, Encrypt, Decrypt,
+            History, Analytics, Settings, or Support.
+          </span>
+        </div>
+      )}
+
+    </div>
+  )}
+
+</div>
+
+    <div className="topbar-actions">
+
+      <button className="notification">
+        !
+      </button>
+
+      <div className="backend-status">
+        <span className="online-dot" />
+        Backend Connected
+      </div>
+
+      <div className="profile">
+        U
+      </div>
+
+    </div>
+
+  </header>
+)}
 
         {/* CONTENT */}
 
-        <main className="content">
+      {activePage === 'settings' ? (
+  <Settings />
+) : activePage === 'decrypt' ? (
+  <DecryptPage
+    decryptToken={decryptToken}
+    onNavigate={(page) => setActivePage(page)}
+  />
+) : activePage === 'history' ? (
+  <HistoryPage
+    onNavigate={(page) => setActivePage(page)}
+  />
+) : activePage === 'analytics' ? (
+  <AnalyticsPage
+    onNavigate={(page) => setActivePage(page)}
+  />
+) : (
+  <main className="content">
 
           {/* HERO */}
 
@@ -589,10 +1147,22 @@ function App() {
 
                 <h3>Recent Activity</h3>
 
-                <button>
-                  View All
-                </button>
+                <button
+  type="button"
+  onClick={() => {
+    const historyButton = [
+      ...document.querySelectorAll('.nav-item'),
+    ].find((item) =>
+      item.textContent
+        ?.toLowerCase()
+        .includes('history')
+    )
 
+    historyButton?.click()
+  }}
+>
+  View All
+</button>
               </div>
 
               <div className="activity-list">
@@ -617,7 +1187,7 @@ function App() {
                       </strong>
 
                       <span>
-                        Encrypted • {item.time}
+                      Encrypted • {formatActivityTime(item.time)}
                       </span>
 
                     </div>
@@ -1175,6 +1745,92 @@ function App() {
           )}
 
         </main>
+        )}
+
+        
+{/* DECRYPT PASSWORD VERIFICATION MODAL */}
+
+{/* DECRYPT PASSWORD VERIFICATION MODAL */}
+{showDecryptVerification && (
+  <div
+    className="decrypt-modal-overlay"
+    onClick={(event) => {
+      if (event.target === event.currentTarget) {
+        setShowDecryptVerification(false)
+        setDecryptPassword('')
+        setDecryptVerifyError('')
+      }
+    }}
+  >
+    <div
+      className="decrypt-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="decrypt-modal-title"
+    >
+      <div className="decrypt-modal-icon">🔐</div>
+
+      <h2 id="decrypt-modal-title">
+        Verify Your Password
+      </h2>
+
+      <p>
+        Re-enter your account password to access secure decryption.
+      </p>
+
+      <form onSubmit={handleDecryptVerification}>
+        <label htmlFor="decrypt-password">
+          Account Password
+        </label>
+
+        <input
+          id="decrypt-password"
+          type="password"
+          value={decryptPassword}
+          onChange={(event) =>
+            setDecryptPassword(event.target.value)
+          }
+          placeholder="Enter your password"
+          autoComplete="current-password"
+          required
+        />
+
+        {decryptVerifyError && (
+          <div className="error-message" role="alert">
+            {decryptVerifyError}
+          </div>
+        )}
+
+        <div className="decrypt-modal-actions">
+          <button
+            type="button"
+            onClick={() => {
+              setShowDecryptVerification(false)
+              setDecryptPassword('')
+              setDecryptVerifyError('')
+            }}
+            disabled={decryptVerifyLoading}
+          >
+            Cancel
+          </button>
+
+          <button
+            type="submit"
+            disabled={decryptVerifyLoading}
+          >
+            {decryptVerifyLoading
+              ? 'Verifying...'
+              : 'Verify & Continue'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
+
+
+
+{/* DECRYPT PASSWORD VERIFICATION MODAL */}
 
 
         {/* FOOTER */}

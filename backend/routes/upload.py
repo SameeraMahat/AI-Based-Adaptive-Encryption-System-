@@ -65,6 +65,10 @@ from encryption.hybrid import (
     encrypt_file as hybrid_encrypt_file
 )
 
+from routes.dashboard import (
+    save_encryption_record,
+    DEMO_USER_ID
+)
 
 # ============================================================
 # BLUEPRINT
@@ -251,10 +255,18 @@ def upload_file():
             filepath
         )
 
+        
+        # Reject empty files before feature extraction
+        original_size = os.path.getsize(filepath)
 
-        original_size = os.path.getsize(
-            filepath
-        )
+        if original_size == 0:
+            os.remove(filepath)
+
+            return jsonify({
+                "error": "Empty file rejected. Please upload a file with content.",
+                "validation_status": "Rejected"
+            }), 400
+
 
 
         # ====================================================
@@ -394,6 +406,7 @@ def upload_file():
         )
 
 
+        
         # ====================================================
         # 11. MACHINE LEARNING PREDICTION
         # ====================================================
@@ -405,11 +418,9 @@ def upload_file():
             system_features
         )
 
-
         predicted_algorithm = ml_prediction.get(
             "algorithm"
         )
-
 
         ml_confidence = float(
             ml_prediction.get(
@@ -418,12 +429,47 @@ def upload_file():
             )
         )
 
+        # ====================================================
+        # ML CONFIDENCE VALIDATION
+        # Reject if confidence is below 60%
+        # ====================================================
+
+        if ml_confidence < CONFIDENCE_THRESHOLD:
+            print()
+            print("-" * 60)
+            print("ML SAFETY VALIDATION: REJECTED")
+            print("-" * 60)
+            print("ML Prediction:", predicted_algorithm)
+            print(
+                "ML Confidence:",
+                f"{ml_confidence * 100:.2f}%"
+            )
+            print(
+                "Required Confidence:",
+                f"{CONFIDENCE_THRESHOLD * 100:.2f}%"
+            )
+            print("Reason: ML confidence below 60%")
+            print("-" * 60)
+
+            return jsonify({
+                "error": (
+                    "File rejected: ML confidence is below 60%."
+                ),
+                "ml_prediction": ml_prediction,
+                "confidence_threshold": CONFIDENCE_THRESHOLD,
+                "validation_status": "Rejected"
+            }), 422
+
+        validation_status = "Approved"
+
+        # ====================================================
+        # ML PREDICTION DETAILS
+        # ====================================================
 
         ml_probabilities = ml_prediction.get(
             "probabilities",
             {}
         )
-
 
         print()
         print("-" * 60)
@@ -444,7 +490,7 @@ def upload_file():
 
         print(
             "ML Confidence:",
-            ml_confidence
+            f"{ml_confidence * 100:.2f}%"
         )
 
         print(
@@ -460,16 +506,51 @@ def upload_file():
             )
         )
 
+        print(
+            "ML Safety Validation:",
+            validation_status
+        )
 
         # ====================================================
-        # 12. ML SAFETY VALIDATION
+        # 12A. FINAL ADAPTIVE ENCRYPTION POLICY
         # ====================================================
 
-        validation_status = "Approved"
+        sensitivity_score = float(
+            sensitivity.get("sensitivity_score", 0)
+        )
+
+        # Use actual uploaded file size, converted to MB
+        file_size_mb = original_size / (1024 * 1024)
+
+        # Keep the original ML prediction for reporting
+        ml_predicted_algorithm = predicted_algorithm
+
+        # Apply the final adaptive policy
+        if sensitivity_score <= 20:
+            final_algorithm = "ChaCha20"
+
+        elif sensitivity_score <= 50:
+            final_algorithm = "AES"
+
+        elif file_size_mb > 10:
+            final_algorithm = "Hybrid"
+
+        else:
+            final_algorithm = "AES"
 
         decision_source = (
-            "Random Forest ML Model"
+            "Random Forest ML Model + Adaptive Policy"
         )
+
+        print()
+        print("-" * 60)
+        print("FINAL ADAPTIVE ENCRYPTION DECISION")
+        print("-" * 60)
+        print("ML Prediction:", ml_predicted_algorithm)
+        print("Sensitivity Score:", sensitivity_score)
+        print("Actual File Size MB:", round(file_size_mb, 4))
+        print("Final Algorithm:", final_algorithm)
+        print("Decision Source:", decision_source)
 
 
         # ----------------------------------------------------
@@ -572,23 +653,22 @@ def upload_file():
 
         encryption_algorithm = (
             ALGORITHM_DISPLAY_NAMES[
-                predicted_algorithm
+                final_algorithm
             ]
         )
 
 
         security_level = (
             ALGORITHM_SECURITY_LEVELS[
-                predicted_algorithm
+                final_algorithm
             ]
         )
 
 
         reason = (
-            "Random Forest ML model selected "
-            f"{encryption_algorithm} based on the "
-            "extracted file, system, PII, classification, "
-            "and sensitivity features."
+               f"Final algorithm {encryption_algorithm} selected using "
+    f"sensitivity score {sensitivity_score} and "
+    f"file size {file_size_mb:.4f} MB under the adaptive policy."
         )
 
 
@@ -605,7 +685,7 @@ def upload_file():
         # 17. AES-256-GCM
         # ====================================================
 
-        if predicted_algorithm == "AES":
+        if final_algorithm == "AES":
 
             print()
             print(
@@ -645,7 +725,7 @@ def upload_file():
         # 18. CHACHA20-POLY1305
         # ====================================================
 
-        elif predicted_algorithm == "ChaCha20":
+        elif final_algorithm == "ChaCha20":
 
             print()
             print(
@@ -685,7 +765,7 @@ def upload_file():
         # 19. HYBRID ENCRYPTION
         # ====================================================
 
-        elif predicted_algorithm == "Hybrid":
+        elif final_algorithm == "Hybrid":
 
             print()
             print(
@@ -870,159 +950,81 @@ def upload_file():
 
 
         # ====================================================
-        # FINAL API RESPONSE
+     
+        # ====================================================
+      
+        # ====================================================
+        # 23. SAVE ENCRYPTION METADATA + FINAL API RESPONSE
         # ====================================================
 
-        return jsonify({
-
-            "message":
-                "File uploaded and encrypted successfully.",
-
-
-            "filename":
-                filename,
-
-
-            # ------------------------------------------------
-            # EXTRACTED INFORMATION
-            # ------------------------------------------------
-
-            "extracted_text":
-                text,
-
-
-            "pii":
-                pii,
-
-
-            "features":
-                features,
-
-
-            "system_features":
-                system_features,
-
-
-            "classification":
-                classification,
-
-
-            "sensitivity":
-                sensitivity,
-
-
-            # ------------------------------------------------
-            # ML DECISION
-            # ------------------------------------------------
-
-            "ml_prediction": {
-
-                "algorithm":
-                    ml_prediction[
-                        "algorithm"
-                    ],
-
-                "display_algorithm":
-                    ml_prediction.get(
-                        "display_algorithm",
-                        encryption_algorithm
-                    ),
-
-                "confidence":
-                    ml_prediction[
-                        "confidence"
-                    ],
-
-                "probabilities":
-                    ml_prediction[
-                        "probabilities"
-                    ],
-
-                "decision_source":
-                    decision_source,
-
-                "validation_status":
-                    validation_status,
-
-                "confidence_threshold":
-                    CONFIDENCE_THRESHOLD,
-
-                "input_features":
-                    ml_prediction.get(
-                        "input_features",
-                        {}
-                    )
-
-            },
-
-
-            # ------------------------------------------------
-            # ACTUAL ENCRYPTION
-            # ------------------------------------------------
-
-            "encryption": {
-
-                "algorithm":
-                    encryption_algorithm,
-
-                "security_level":
-                    security_level,
-
-                "reason":
-                    reason,
-
-                "decision_source":
-                    decision_source,
-
-                "encrypted_file":
-                    encrypted_filename,
-
-                "key_file":
-                    key_path,
-
-                "public_key_file":
-                    public_key_path
-
-            },
-
-
-            # ------------------------------------------------
-            # PERFORMANCE
-            # ------------------------------------------------
-
-            "performance":
-                performance
-
-        }), 200
-
-
-    # ========================================================
-    # ERROR HANDLING
-    # ========================================================
-
-    except Exception as e:
-
-        print()
-        print("=" * 60)
-        print("UPLOAD / ENCRYPTION ERROR")
-        print("=" * 60)
-
-        print(
-            repr(e)
+        save_encryption_record(
+            user_id=DEMO_USER_ID,
+            filename=filename,
+            file_type=system_features.get("file_type"),
+            file_size_mb=original_size / (1024 * 1024),
+            pii_count=sensitivity.get("pii_count", 0),
+            sensitivity_score=sensitivity_score,
+            document_category=classification.get("document_category"),
+            ml_algorithm=ml_predicted_algorithm,
+            ml_confidence=ml_confidence,
+            security_validation=validation_status,
+            encryption_algorithm=encryption_algorithm,
+            key_size=256 if final_algorithm != "Hybrid" else 2048,
+            processing_time_ms=round(encryption_time_ms, 2),
+            status="Success"
         )
 
-        print("=" * 60)
+        return jsonify({
+            "message": "File uploaded and encrypted successfully.",
+            "filename": filename,
+            "extracted_text": text,
+            "pii": pii,
+            "features": features,
+            "system_features": system_features,
+            "classification": classification,
+            "sensitivity": sensitivity,
 
+            "ml_prediction": {
+                "algorithm": ml_prediction["algorithm"],
+                "display_algorithm": ml_prediction.get(
+                    "display_algorithm",
+                    encryption_algorithm
+                ),
+                "confidence": ml_prediction["confidence"],
+                "probabilities": ml_prediction["probabilities"],
+                "decision_source": ml_prediction.get(
+                    "decision_source",
+                    "Random Forest ML Model"
+                ),
+                "validation_status": validation_status,
+                "confidence_threshold": CONFIDENCE_THRESHOLD,
+                "input_features": ml_prediction.get(
+                    "input_features", {}
+                )
+            },
+
+                        "encryption": {
+                "algorithm": encryption_algorithm,
+                "security_level": security_level,
+                "reason": reason,
+                "decision_source": decision_source,
+                "encrypted_file": encrypted_filename,
+                "key_file": key_path,
+                "public_key_file": public_key_path
+            },
+
+            "performance": performance
+        }), 200
+
+    except Exception as e:
+        print(f"Upload error: {e}")
 
         return jsonify({
-
-            "error":
-                str(e)
-
+            "error": "An error occurred during file upload.",
+            "details": str(e)
         }), 500
 
-
-# ============================================================
+    # ============================================================
 # DOWNLOAD ENCRYPTED FILE
 # ============================================================
 
@@ -1031,6 +1033,17 @@ def upload_file():
     methods=["GET"]
 )
 def download_file(filename):
+
+    encrypted_path = os.path.join(
+        ENCRYPTED_FOLDER,
+        filename
+    )
+
+    if not os.path.isfile(encrypted_path):
+        return jsonify({
+            "error": "Encrypted file not found.",
+            "filename": filename
+        }), 404
 
     return send_from_directory(
         ENCRYPTED_FOLDER,
